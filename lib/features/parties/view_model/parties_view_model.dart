@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../model/party.dart';
 import '../service/parties_service.dart';
@@ -60,6 +61,7 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
         allParties: parties,
       );
     } catch (e) {
+      debugPrint('[PartiesViewModel] error: $e');
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
@@ -88,6 +90,8 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
     double? brokerageRate,
     String? panGstin,
     String? deliveryAddress,
+    String? phoneNumber,
+    String? alternatePhoneNumber,
   }) async {
     state = state.copyWith(isLoading: true);
 
@@ -99,12 +103,15 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
         brokerageRate: brokerageRate,
         panGstin: panGstin,
         deliveryAddress: deliveryAddress,
+        phoneNumber: phoneNumber,
+        alternatePhoneNumber: alternatePhoneNumber,
       );
 
       await loadParties();
       return true;
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      debugPrint('[PartiesViewModel] createParty error: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
   }
@@ -117,6 +124,8 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
     double? brokerageRate,
     String? panGstin,
     String? deliveryAddress,
+    String? phoneNumber,
+    String? alternatePhoneNumber,
   }) async {
     state = state.copyWith(isLoading: true);
 
@@ -129,12 +138,15 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
         brokerageRate: brokerageRate,
         panGstin: panGstin,
         deliveryAddress: deliveryAddress,
+        phoneNumber: phoneNumber,
+        alternatePhoneNumber: alternatePhoneNumber,
       );
 
       await loadParties();
       return true;
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      debugPrint('[PartiesViewModel] updateParty error: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
   }
@@ -145,7 +157,8 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
       await loadParties();
       return true;
     } catch (e) {
-      state = state.copyWith(errorMessage: e.toString());
+      debugPrint('[PartiesViewModel] deleteParty error: $e');
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return false;
     }
   }

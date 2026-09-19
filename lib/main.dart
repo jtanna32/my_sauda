@@ -7,10 +7,9 @@ import 'package:my_sauda/core/theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
+   await Supabase.initialize(
     url: 'https://frsfgjqtvtnhvefsqimf.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyc2ZnanF0dnRuaHZlZnNxaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2Mzk5NzUsImV4cCI6MjA5MzIxNTk3NX0.pFK3fZOQcSbuZCldN_wdE5TnlFCGNZWPZd-Aj9tQZ2U',
+   anonKey: 'sb_publishable_TyYILlWW0faue5lGtEncjQ_-zsOP0c3',
   );
 
   runApp(const ProviderScope(child: MyApp()));

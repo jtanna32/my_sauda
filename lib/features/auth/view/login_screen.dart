@@ -47,14 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
 
-    // 🔥 Clear messages after displaying (prevents repetition)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (authState.errorMessage != null ||
-          authState.successMessage != null) {
-        ref.read(authViewModelProvider.notifier).clearMessages();
-      }
-    });
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(

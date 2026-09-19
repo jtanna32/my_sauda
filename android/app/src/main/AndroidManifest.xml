@@ -30,4 +30,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
+    <!-- Required on Android 11+ so the app can detect and launch WhatsApp
+         (and other apps) via https:// links such as wa.me. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>

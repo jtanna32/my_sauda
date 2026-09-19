@@ -23,6 +23,8 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
   late TextEditingController _brokerageController;
   late TextEditingController _panController;
   late TextEditingController _addressController;
+  late TextEditingController _phoneController;
+  late TextEditingController _altPhoneController;
 
   String? selectedState;
   String? selectedCity;
@@ -80,6 +82,9 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
         TextEditingController(text: p?.brokerageRate?.toString() ?? '');
     _panController = TextEditingController(text: p?.panGstin ?? '');
     _addressController = TextEditingController(text: p?.deliveryAddress ?? '');
+    _phoneController = TextEditingController(text: p?.phoneNumber ?? '');
+    _altPhoneController =
+        TextEditingController(text: p?.alternatePhoneNumber ?? '');
 
     selectedState = p?.state;
     selectedCity = p?.city;
@@ -91,6 +96,8 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
     _brokerageController.dispose();
     _panController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
+    _altPhoneController.dispose();
     super.dispose();
   }
 
@@ -149,6 +156,12 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
         deliveryAddress: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
+        phoneNumber: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        alternatePhoneNumber: _altPhoneController.text.trim().isEmpty
+            ? null
+            : _altPhoneController.text.trim(),
       );
     } else {
       success = await vm.createParty(
@@ -162,13 +175,18 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
         deliveryAddress: _addressController.text.trim().isEmpty
             ? null
             : _addressController.text.trim(),
+        phoneNumber: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        alternatePhoneNumber: _altPhoneController.text.trim().isEmpty
+            ? null
+            : _altPhoneController.text.trim(),
       );
     }
 
     if (!mounted) return;
 
     if (success) {
-      /// ✅ SHOW SNACKBAR
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -182,6 +200,16 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
       );
 
       context.pop();
+    } else {
+      final error = ref.read(partiesViewModelProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Something went wrong. Please try again.'),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      ref.read(partiesViewModelProvider.notifier).clearMessages();
     }
   }
 
@@ -253,6 +281,32 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
                 label: 'PAN / GSTIN (optional)',
                 hint: 'Enter PAN or GSTIN',
                 controller: _panController,
+              ),
+              const SizedBox(height: 18),
+
+              CustomTextField(
+                label: 'Phone Number (optional)',
+                hint: 'Enter 10-digit phone number',
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  if (v.trim().length != 10) return 'Phone number must be 10 digits';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 18),
+
+              CustomTextField(
+                label: 'Alternate Phone (optional)',
+                hint: 'Enter alternate phone number',
+                controller: _altPhoneController,
+                keyboardType: TextInputType.phone,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  if (v.trim().length != 10) return 'Phone number must be 10 digits';
+                  return null;
+                },
               ),
               const SizedBox(height: 18),
 

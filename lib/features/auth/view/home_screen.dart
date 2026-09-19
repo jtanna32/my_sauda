@@ -56,13 +56,13 @@ class HomeScreen extends StatelessWidget {
                     icon: Icons.receipt_long,
                     title: 'Sauda',
                     subtitle: 'Create contracts',
-                    onTap: () {},
+                    onTap: () => context.push('/saudas'),
                   ),
                   _HomeCard(
                     icon: Icons.account_balance,
                     title: 'Firms',
                     subtitle: 'Manage firms',
-                    onTap: () {},
+                    onTap: () => context.push('/firms'),
                   ),
                   _HomeCard(
                     icon: Icons.description,
@@ -105,7 +105,7 @@ class _HomeCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha:0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -119,7 +119,7 @@ class _HomeCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: AppTheme.primaryColor),

@@ -2,34 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:my_sauda/core/theme/app_theme.dart';
-import '../view_model/parties_view_model.dart';
+import '../view_model/firms_view_model.dart';
 
-class PartiesListScreen extends ConsumerStatefulWidget {
-  const PartiesListScreen({super.key});
+class FirmsListScreen extends ConsumerStatefulWidget {
+  const FirmsListScreen({super.key});
 
   @override
-  ConsumerState<PartiesListScreen> createState() =>
-      _PartiesListScreenState();
+  ConsumerState<FirmsListScreen> createState() => _FirmsListScreenState();
 }
 
-class _PartiesListScreenState
-    extends ConsumerState<PartiesListScreen> {
+class _FirmsListScreenState extends ConsumerState<FirmsListScreen> {
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(partiesViewModelProvider.notifier).loadParties();
+      ref.read(firmsViewModelProvider.notifier).loadFirms();
     });
   }
 
-  Future<void> _confirmDelete(
-      BuildContext context, String id, String name) async {
-    final vm = ref.read(partiesViewModelProvider.notifier);
+  Future<void> _confirmDelete(String id, String name) async {
+    if (!mounted) return;
+
+    final vm = ref.read(firmsViewModelProvider.notifier);
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Party'),
+        title: const Text('Delete Firm'),
         content: Text('Are you sure you want to delete "$name"?'),
         actions: [
           TextButton(
@@ -48,23 +47,20 @@ class _PartiesListScreenState
     );
 
     if (confirm != true) return;
+    if (!mounted) return;
 
-    /// ✅ Capture messenger BEFORE async call
     final messenger = ScaffoldMessenger.of(context);
-
-    final success = await vm.deleteParty(id);
+    final success = await vm.deleteFirm(id);
 
     if (!mounted) return;
 
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          success
-              ? 'Party deleted successfully'
-              : 'Failed to delete party',
+          success ? 'Firm deleted successfully' : 'Failed to delete firm',
         ),
         backgroundColor:
-        success ? AppTheme.primaryColor : AppTheme.errorColor,
+            success ? AppTheme.primaryColor : AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -72,16 +68,16 @@ class _PartiesListScreenState
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(partiesViewModelProvider);
+    final state = ref.watch(firmsViewModelProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text('Parties'),
+        title: const Text('Firms'),
         centerTitle: true,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: state.isLoading ? null : () => context.push('/add-party'),
+        onPressed: state.isLoading ? null : () => context.push('/add-firm'),
         backgroundColor: AppTheme.primaryColor,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -91,7 +87,7 @@ class _PartiesListScreenState
           children: [
             TextField(
               decoration: InputDecoration(
-                hintText: 'Search parties...',
+                hintText: 'Search firms...',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: AppTheme.surfaceColor,
@@ -102,11 +98,10 @@ class _PartiesListScreenState
               ),
               onChanged: (value) {
                 ref
-                    .read(partiesViewModelProvider.notifier)
-                    .searchParties(value);
+                    .read(firmsViewModelProvider.notifier)
+                    .searchFirms(value);
               },
             ),
-
             const SizedBox(height: 16),
             Expanded(
               child: Builder(
@@ -119,17 +114,22 @@ class _PartiesListScreenState
                     return Center(child: Text(state.errorMessage!));
                   }
 
-                  if (state.parties.isEmpty) {
-                    return const Center(child: Text('No parties yet\n'
-                        'Tap + to add your first party', textAlign: TextAlign.center,));
+                  if (state.firms.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No firms yet\nTap + to add your first firm',
+                        textAlign: TextAlign.center,
+                      ),
+                    );
                   }
 
                   return RefreshIndicator(
-                    onRefresh: () => ref.read(partiesViewModelProvider.notifier).loadParties(),
+                    onRefresh: () =>
+                        ref.read(firmsViewModelProvider.notifier).loadFirms(),
                     child: ListView.builder(
-                      itemCount: state.parties.length,
+                      itemCount: state.firms.length,
                       itemBuilder: (context, index) {
-                        final party = state.parties[index];
+                        final firm = state.firms[index];
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 14),
@@ -139,7 +139,7 @@ class _PartiesListScreenState
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -148,71 +148,66 @@ class _PartiesListScreenState
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () {
-                              context.push(
-                                '/add-party',
-                                extra: party,
-                              );
+                              context.push('/add-firm', extra: firm);
                             },
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        party.partyName,
+                                        firm.firmName,
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodyLarge!
                                             .copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.delete,
                                           color: AppTheme.errorColor),
                                       onPressed: () => _confirmDelete(
-                                        context,
-                                        party.id,
-                                        party.partyName,
+                                        firm.id,
+                                        firm.firmName,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${party.city}, ${party.state}',
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                if (party.phoneNumber != null &&
-                                    party.phoneNumber!.isNotEmpty) ...[
+                                if (firm.proprietorName != null &&
+                                    firm.proprietorName!.isNotEmpty) ...[
                                   const SizedBox(height: 4),
                                   Text(
-                                    party.phoneNumber!,
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    firm.proprietorName!,
+                                    style:
+                                        Theme.of(context).textTheme.bodyMedium,
                                   ),
                                 ],
-                                const SizedBox(height: 10),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color:
-                                    AppTheme.primaryColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Code: ${party.partyCode}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.primaryColor,
+                                if (firm.phoneNumber != null &&
+                                    firm.phoneNumber!.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      firm.phoneNumber!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primaryColor,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
