@@ -3,12 +3,18 @@ import 'package:my_sauda/features/auth/view/forgot_password_screen.dart';
 import 'package:my_sauda/features/auth/view/home_screen.dart';
 import 'package:my_sauda/features/auth/view/login_screen.dart';
 import 'package:my_sauda/features/auth/view/register_screen.dart';
+import 'package:my_sauda/features/bills/model/bill.dart';
+import 'package:my_sauda/features/bills/view/bill_preview_screen.dart';
+import 'package:my_sauda/features/bills/view/bill_view_screen.dart';
+import 'package:my_sauda/features/bills/view/bills_screen.dart';
+import 'package:my_sauda/features/bills/view/generate_bill_screen.dart';
 import 'package:my_sauda/features/firms/model/firm.dart';
 import 'package:my_sauda/features/firms/view/firms_list_screen.dart';
 import 'package:my_sauda/features/firms/view/add_edit_firm_screen.dart';
 import 'package:my_sauda/features/parties/model/party.dart';
 import 'package:my_sauda/features/parties/view/parties_list_screen.dart';
 import 'package:my_sauda/features/parties/view/add_edit_party_screen.dart';
+import 'package:my_sauda/features/sauda/model/new_sauda_preset.dart';
 import 'package:my_sauda/features/sauda/model/sauda.dart';
 import 'package:my_sauda/features/sauda/view/saudas_list_screen.dart';
 import 'package:my_sauda/features/sauda/view/add_edit_sauda_screen.dart';
@@ -67,12 +73,29 @@ final router = GoRouter(
     GoRoute(
       path: '/add-sauda',
       builder: (context, state) {
-        final extra = state.extra as Sauda?;
+        final extra = state.extra;
 
         return AddEditSaudaScreen(
-          sauda: extra,
+          sauda: extra is Sauda ? extra : null,
+          preset: extra is NewSaudaPreset ? extra : null,
         );
       },
+    ),
+    GoRoute(
+      path: '/bills',
+      builder: (context, state) => const BillsScreen(),
+    ),
+    GoRoute(
+      path: '/generate-bill',
+      builder: (context, state) => const GenerateBillScreen(),
+    ),
+    GoRoute(
+      path: '/bill-preview',
+      builder: (context, state) => const BillPreviewScreen(),
+    ),
+    GoRoute(
+      path: '/bill-view',
+      builder: (context, state) => BillViewScreen(bill: state.extra as Bill),
     ),
   ],
 );

@@ -6,6 +6,7 @@ import 'package:my_sauda/core/utils/whatsapp_helper.dart';
 import 'package:my_sauda/core/widgets/suggestion_picker_dialog.dart';
 import 'package:my_sauda/features/parties/model/party.dart';
 import 'package:my_sauda/features/sauda/model/item.dart';
+import 'package:my_sauda/features/sauda/model/new_sauda_preset.dart';
 import 'package:my_sauda/features/sauda/model/sauda.dart';
 import 'package:my_sauda/features/sauda/model/unit.dart';
 import 'package:my_sauda/features/sauda/view_model/saudas_view_model.dart';
@@ -15,8 +16,9 @@ import 'package:my_sauda/features/sauda/widgets/party_picker_dialog.dart';
 
 class AddEditSaudaScreen extends ConsumerStatefulWidget {
   final Sauda? sauda;
+  final NewSaudaPreset? preset;
 
-  const AddEditSaudaScreen({super.key, this.sauda});
+  const AddEditSaudaScreen({super.key, this.sauda, this.preset});
 
   @override
   ConsumerState<AddEditSaudaScreen> createState() => _AddEditSaudaScreenState();
@@ -62,6 +64,9 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
 
   bool get _isEdit => widget.sauda != null;
 
+  bool get _buyerLocked => widget.preset?.buyer != null;
+  bool get _sellerLocked => widget.preset?.seller != null;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +74,31 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     Future.microtask(() async {
       await ref.read(unitsViewModelProvider.notifier).loadUnits();
       _initializeForEdit();
+      _applyPreset();
     });
+  }
+
+  void _applyPreset() {
+    final preset = widget.preset;
+    if (preset == null || !mounted) return;
+    final buyer = preset.buyer;
+    final seller = preset.seller;
+
+    if (buyer != null) {
+      _selectedBuyerParty = buyer;
+      if (buyer.brokerageRate != null) {
+        _buyerBrokerageRateController.text =
+            buyer.brokerageRate!.toStringAsFixed(2);
+      }
+    }
+    if (seller != null) {
+      _selectedSellerParty = seller;
+      if (seller.brokerageRate != null) {
+        _sellerBrokerageRateController.text =
+            seller.brokerageRate!.toStringAsFixed(2);
+      }
+    }
+    _recalculateBrokerage();
   }
 
   void _initializeForEdit() {
@@ -353,6 +382,10 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     if (!mounted) return;
 
     if (result != null) {
+      if (widget.preset != null) {
+        context.pop(_createdWithEnteredRates(result));
+        return;
+      }
       if (_sendToParties) {
         await _showSendToPartiesSheet(result);
         if (!mounted) return;
@@ -367,6 +400,22 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
       ));
       ref.read(saudasViewModelProvider.notifier).clearMessages();
     }
+  }
+
+  // A sauda only stores the brokerage amount, so the rates typed in this form
+  // are re-attached for the caller instead of the parties' default rates.
+  Sauda _createdWithEnteredRates(Sauda created) {
+    final joined = ref
+        .read(saudasViewModelProvider)
+        .allSaudas
+        .where((s) => s.id == created.id)
+        .firstOrNull;
+    return (joined ?? created).copyWith(
+      buyerBrokerageRate:
+          double.tryParse(_buyerBrokerageRateController.text.trim()) ?? 0,
+      sellerBrokerageRate:
+          double.tryParse(_sellerBrokerageRateController.text.trim()) ?? 0,
+    );
   }
 
   // Builds the WhatsApp message shown to [partyLabel] ('Buyer' or 'Seller'),
@@ -560,7 +609,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
   Widget _pickerField({
     required String label,
     required String? value,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     bool required = false,
   }) {
     return GestureDetector(
@@ -569,7 +618,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         child: TextFormField(
           decoration: InputDecoration(
             labelText: label,
-            suffixIcon: const Icon(Icons.arrow_drop_down),
+            suffixIcon: onTap == null ? null : const Icon(Icons.arrow_drop_down),
           ),
           controller: TextEditingController(text: value ?? ''),
           validator: required
@@ -811,7 +860,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
               _pickerField(
                 label: 'Buyer Party *',
                 value: _selectedBuyerParty?.partyName,
-                onTap: _pickBuyerParty,
+                onTap: _buyerLocked ? null : _pickBuyerParty,
                 required: true,
               ),
 
@@ -860,7 +909,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
               _pickerField(
                 label: 'Seller Party *',
                 value: _selectedSellerParty?.partyName,
-                onTap: _pickSellerParty,
+                onTap: _sellerLocked ? null : _pickSellerParty,
                 required: true,
               ),
 
@@ -958,16 +1007,18 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
               ),
 
               // ── Options ───────────────────────────────────
-              _sectionHeader('Options'),
-
-              SwitchListTile(
-                value: _sendToParties,
-                onChanged: (v) => setState(() => _sendToParties = v),
-                title: const Text('Send to Parties'),
-                subtitle: const Text('Share this sauda with buyer and seller'),
-                activeThumbColor: AppTheme.primaryColor,
-                contentPadding: EdgeInsets.zero,
-              ),
+              if (widget.preset == null) ...[
+                _sectionHeader('Options'),
+                SwitchListTile(
+                  value: _sendToParties,
+                  onChanged: (v) => setState(() => _sendToParties = v),
+                  title: const Text('Send to Parties'),
+                  subtitle:
+                      const Text('Share this sauda with buyer and seller'),
+                  activeThumbColor: AppTheme.primaryColor,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
             ],
           ),
         ),
