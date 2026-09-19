@@ -116,7 +116,10 @@ void main() {
               ShareRow(
                 label: 'Buyer',
                 value: 'AGT Foods India Pvt Ltd',
-                detail: 'GSTIN: 27AAACA1234A1Z5',
+                details: [
+                  'GSTIN: 27AAACA1234A1Z5',
+                  'Plot 5, GIDC, Surat, Gujarat',
+                ],
               ),
               ShareRow(label: 'Seller', value: 'Movaliya Traders'),
             ],
@@ -127,9 +130,12 @@ void main() {
 
     final name = tester.getTopLeft(find.text('AGT Foods India Pvt Ltd'));
     final gstin = tester.getTopLeft(find.text('GSTIN: 27AAACA1234A1Z5'));
+    final address =
+        tester.getTopLeft(find.text('Plot 5, GIDC, Surat, Gujarat'));
     final seller = tester.getTopLeft(find.text('Movaliya Traders'));
     expect(gstin.dx, name.dx);
-    expect(gstin.dy > name.dy && gstin.dy < seller.dy, isTrue);
+    expect(gstin.dy > name.dy && gstin.dy < address.dy, isTrue);
+    expect(address.dy < seller.dy, isTrue);
     expect(find.textContaining('GSTIN'), findsOneWidget);
   });
 }

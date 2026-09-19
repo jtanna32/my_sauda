@@ -10,8 +10,8 @@ class SaudasService {
     try {
       final response = await _client.from('saudas').select('''
         *,
-        buyer_party:parties!buyer_party_id(id, party_name, party_code, brokerage_rate, delivery_address, pan_gstin),
-        seller_party:parties!seller_party_id(id, party_name, party_code, brokerage_rate, pan_gstin),
+        buyer_party:parties!buyer_party_id(id, party_name, party_code, brokerage_rate, delivery_address, pan_gstin, city, state),
+        seller_party:parties!seller_party_id(id, party_name, party_code, brokerage_rate, delivery_address, pan_gstin, city, state),
         item:items!item_id(id, item_name),
         unit:units!unit_id(id, name)
       ''').order('created_at', ascending: false);

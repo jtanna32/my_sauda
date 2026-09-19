@@ -4,10 +4,14 @@ import 'package:my_sauda/core/theme/app_theme.dart';
 class ShareRow {
   final String label;
   final String value;
-  // Smaller second line under the value, e.g. a party's GSTIN.
-  final String? detail;
+  // Smaller lines under the value, e.g. a party's GSTIN and address.
+  final List<String> details;
 
-  const ShareRow({required this.label, required this.value, this.detail});
+  const ShareRow({
+    required this.label,
+    required this.value,
+    this.details = const [],
+  });
 }
 
 class SaudaShareCard extends StatelessWidget {
@@ -124,12 +128,11 @@ class SaudaShareCard extends StatelessWidget {
                                       color: AppTheme.textColor,
                                     ),
                                   ),
-                                  if (row.detail != null &&
-                                      row.detail!.isNotEmpty)
+                                  for (final detail in row.details)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 2),
                                       child: Text(
-                                        row.detail!,
+                                        detail,
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey.shade700,

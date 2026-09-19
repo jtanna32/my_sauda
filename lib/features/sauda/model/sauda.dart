@@ -35,6 +35,9 @@ class Sauda {
   final String? buyerPartyName;
   final String? buyerPartyCode;
   final String? buyerPartyGstin;
+  final String? buyerPartyAddress;
+  final String? buyerPartyCity;
+  final String? buyerPartyState;
   final double? buyerBrokerageRate;
   final double buyerSideBrokerage;
 
@@ -42,6 +45,9 @@ class Sauda {
   final String? sellerPartyName;
   final String? sellerPartyCode;
   final String? sellerPartyGstin;
+  final String? sellerPartyAddress;
+  final String? sellerPartyCity;
+  final String? sellerPartyState;
   final double? sellerBrokerageRate;
   final double sellerSideBrokerage;
 
@@ -74,12 +80,18 @@ class Sauda {
     this.buyerPartyName,
     this.buyerPartyCode,
     this.buyerPartyGstin,
+    this.buyerPartyAddress,
+    this.buyerPartyCity,
+    this.buyerPartyState,
     this.buyerBrokerageRate,
     required this.buyerSideBrokerage,
     required this.sellerPartyId,
     this.sellerPartyName,
     this.sellerPartyCode,
     this.sellerPartyGstin,
+    this.sellerPartyAddress,
+    this.sellerPartyCity,
+    this.sellerPartyState,
     this.sellerBrokerageRate,
     required this.sellerSideBrokerage,
     this.quantityRemarks,
@@ -124,6 +136,9 @@ class Sauda {
       buyerPartyName: buyer?['party_name'],
       buyerPartyCode: buyer?['party_code'],
       buyerPartyGstin: buyer?['pan_gstin'],
+      buyerPartyAddress: buyer?['delivery_address'],
+      buyerPartyCity: buyer?['city'],
+      buyerPartyState: buyer?['state'],
       buyerBrokerageRate: buyer?['brokerage_rate'] != null
           ? (buyer!['brokerage_rate'] as num).toDouble()
           : null,
@@ -132,6 +147,9 @@ class Sauda {
       sellerPartyName: seller?['party_name'],
       sellerPartyCode: seller?['party_code'],
       sellerPartyGstin: seller?['pan_gstin'],
+      sellerPartyAddress: seller?['delivery_address'],
+      sellerPartyCity: seller?['city'],
+      sellerPartyState: seller?['state'],
       sellerBrokerageRate: seller?['brokerage_rate'] != null
           ? (seller!['brokerage_rate'] as num).toDouble()
           : null,
@@ -167,12 +185,18 @@ class Sauda {
     String? buyerPartyName,
     String? buyerPartyCode,
     String? buyerPartyGstin,
+    String? buyerPartyAddress,
+    String? buyerPartyCity,
+    String? buyerPartyState,
     double? buyerBrokerageRate,
     double? buyerSideBrokerage,
     String? sellerPartyId,
     String? sellerPartyName,
     String? sellerPartyCode,
     String? sellerPartyGstin,
+    String? sellerPartyAddress,
+    String? sellerPartyCity,
+    String? sellerPartyState,
     double? sellerBrokerageRate,
     double? sellerSideBrokerage,
     String? quantityRemarks,
@@ -202,12 +226,18 @@ class Sauda {
       buyerPartyName: buyerPartyName ?? this.buyerPartyName,
       buyerPartyCode: buyerPartyCode ?? this.buyerPartyCode,
       buyerPartyGstin: buyerPartyGstin ?? this.buyerPartyGstin,
+      buyerPartyAddress: buyerPartyAddress ?? this.buyerPartyAddress,
+      buyerPartyCity: buyerPartyCity ?? this.buyerPartyCity,
+      buyerPartyState: buyerPartyState ?? this.buyerPartyState,
       buyerBrokerageRate: buyerBrokerageRate ?? this.buyerBrokerageRate,
       buyerSideBrokerage: buyerSideBrokerage ?? this.buyerSideBrokerage,
       sellerPartyId: sellerPartyId ?? this.sellerPartyId,
       sellerPartyName: sellerPartyName ?? this.sellerPartyName,
       sellerPartyCode: sellerPartyCode ?? this.sellerPartyCode,
       sellerPartyGstin: sellerPartyGstin ?? this.sellerPartyGstin,
+      sellerPartyAddress: sellerPartyAddress ?? this.sellerPartyAddress,
+      sellerPartyCity: sellerPartyCity ?? this.sellerPartyCity,
+      sellerPartyState: sellerPartyState ?? this.sellerPartyState,
       sellerBrokerageRate: sellerBrokerageRate ?? this.sellerBrokerageRate,
       sellerSideBrokerage: sellerSideBrokerage ?? this.sellerSideBrokerage,
       quantityRemarks: quantityRemarks ?? this.quantityRemarks,

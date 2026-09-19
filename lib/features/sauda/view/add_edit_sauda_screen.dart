@@ -166,10 +166,11 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         userId: '',
         partyCode: s.buyerPartyCode ?? '',
         panGstin: s.buyerPartyGstin,
+        deliveryAddress: s.buyerPartyAddress,
         partyName: s.buyerPartyName!,
         brokerageRate: s.buyerBrokerageRate,
-        city: '',
-        state: '',
+        city: s.buyerPartyCity ?? '',
+        state: s.buyerPartyState ?? '',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -181,10 +182,11 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         userId: '',
         partyCode: s.sellerPartyCode ?? '',
         panGstin: s.sellerPartyGstin,
+        deliveryAddress: s.sellerPartyAddress,
         partyName: s.sellerPartyName!,
         brokerageRate: s.sellerBrokerageRate,
-        city: '',
-        state: '',
+        city: s.sellerPartyCity ?? '',
+        state: s.sellerPartyState ?? '',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -449,9 +451,18 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     );
   }
 
-  String? _gstinLine(Party? party) {
-    final gstin = party?.panGstin?.trim() ?? '';
-    return gstin.isEmpty ? null : 'GSTIN: $gstin';
+  // GSTIN, then "delivery address, city, state" with any missing part skipped.
+  List<String> _partyDetails(Party? party) {
+    if (party == null) return const [];
+    final gstin = party.panGstin?.trim() ?? '';
+    final address = [party.deliveryAddress, party.city, party.state]
+        .map((part) => part?.trim() ?? '')
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+    return [
+      if (gstin.isNotEmpty) 'GSTIN: $gstin',
+      if (address.isNotEmpty) address,
+    ];
   }
 
   // One image goes to both parties, so it carries no brokerage.
@@ -478,12 +489,12 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
       ShareRow(
         label: 'Buyer',
         value: _selectedBuyerParty?.partyName ?? '-',
-        detail: _gstinLine(_selectedBuyerParty),
+        details: _partyDetails(_selectedBuyerParty),
       ),
       ShareRow(
         label: 'Seller',
         value: _selectedSellerParty?.partyName ?? '-',
-        detail: _gstinLine(_selectedSellerParty),
+        details: _partyDetails(_selectedSellerParty),
       ),
     ];
 

@@ -140,7 +140,10 @@ void main() {
         'buyer_party_id': 'A',
         'buyer_party': {
           'party_name': 'Buyer A',
-          'pan_gstin': '27AAACA1234A1Z5'
+          'pan_gstin': '27AAACA1234A1Z5',
+          'delivery_address': 'Plot 5, GIDC',
+          'city': 'Surat',
+          'state': 'Gujarat',
         },
         'buyer_side_brokerage': 0,
         'seller_party_id': 'B',
@@ -149,7 +152,11 @@ void main() {
         'created_at': '2026-01-10T00:00:00Z',
       });
       expect(sauda.buyerPartyGstin, '27AAACA1234A1Z5');
+      expect(sauda.buyerPartyAddress, 'Plot 5, GIDC');
+      expect(sauda.buyerPartyCity, 'Surat');
+      expect(sauda.buyerPartyState, 'Gujarat');
       expect(sauda.sellerPartyGstin, isNull);
+      expect(sauda.sellerPartyCity, isNull);
     });
 
     test('numeric rate parsing is strict', () {
