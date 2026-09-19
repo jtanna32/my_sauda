@@ -4,14 +4,22 @@ import 'bill.dart';
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+// The role [partyId] plays in [s], limited to the roles the bill covers. Buyer wins if the party is on both sides.
+BillSide? sideOfParty(Sauda s, String partyId, Set<BillSide> sides) {
+  for (final side in BillSide.values) {
+    if (sides.contains(side) && side.partyIdOf(s) == partyId) return side;
+  }
+  return null;
+}
+
 List<Sauda> matchSaudas(
   List<Sauda> all, {
   required String partyId,
-  required BillSide side,
+  required Set<BillSide> sides,
   DateTimeRange? range,
 }) {
   final matched = all.where((s) {
-    if (side.partyIdOf(s) != partyId) return false;
+    if (sideOfParty(s, partyId, sides) == null) return false;
     if (range == null) return true;
     final d = _dateOnly(s.saudaDate);
     return !d.isBefore(_dateOnly(range.start)) &&

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:my_sauda/core/theme/app_theme.dart';
+import 'package:my_sauda/features/bills/model/bill_format.dart';
 import '../model/sauda.dart';
 import '../view_model/saudas_view_model.dart';
 import '../widgets/sauda_filter_sheet.dart';
@@ -18,7 +19,9 @@ class _SaudasListScreenState extends ConsumerState<SaudasListScreen> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(saudasViewModelProvider.notifier).loadSaudas();
+      final vm = ref.read(saudasViewModelProvider.notifier);
+      vm.applyCurrentMonthFilter();
+      vm.loadSaudas();
     });
   }
 
@@ -31,8 +34,7 @@ class _SaudasListScreenState extends ConsumerState<SaudasListScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Sauda'),
-        content:
-            Text('Are you sure you want to delete sauda "$saudaNumber"?'),
+        content: Text('Are you sure you want to delete sauda "$saudaNumber"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -57,13 +59,16 @@ class _SaudasListScreenState extends ConsumerState<SaudasListScreen> {
 
     if (!mounted) return;
 
+    final failure = ref.read(saudasViewModelProvider).errorMessage ??
+        'Failed to delete sauda';
+    if (!success) vm.clearMessages();
+
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Sauda deleted successfully' : 'Failed to delete sauda',
+          success ? 'Sauda deleted successfully' : failure,
         ),
-        backgroundColor:
-            success ? AppTheme.primaryColor : AppTheme.errorColor,
+        backgroundColor: success ? AppTheme.primaryColor : AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -202,7 +207,15 @@ class _SaudasListScreenState extends ConsumerState<SaudasListScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            if (!state.isLoading && state.errorMessage == null) ...[
+              _SummaryCard(
+                saudaCount: state.saudas.length,
+                totalTons: state.totalTons,
+                totalBrokerage: state.totalBrokerage,
+              ),
+              const SizedBox(height: 12),
+            ],
             Expanded(
               child: Builder(
                 builder: (_) {
@@ -247,6 +260,72 @@ class _SaudasListScreenState extends ConsumerState<SaudasListScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final int saudaCount;
+  final double totalTons;
+  final double totalBrokerage;
+
+  const _SummaryCard({
+    required this.saudaCount,
+    required this.totalTons,
+    required this.totalBrokerage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          _stat(context, 'Saudas', '$saudaCount'),
+          _stat(context, 'Total Tons', totalTons.toStringAsFixed(3)),
+          _stat(
+            context,
+            'Total Brokerage',
+            '₹${formatBillAmount(totalBrokerage)}',
+            flex: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(BuildContext context, String label, String value,
+      {int flex = 1}) {
+    return Expanded(
+      flex: flex,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryColor,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -335,7 +414,7 @@ class _SaudaCard extends StatelessWidget {
                 ),
               const SizedBox(height: 6),
               Text(
-                '${sauda.quantity} ${sauda.unitName ?? ''} @ ₹${sauda.ratePerQuintal.toStringAsFixed(2)}/qtl',
+                '${sauda.quantity} ${sauda.unitName ?? ''} @ ${sauda.rateDisplay}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 10),

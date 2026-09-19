@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/party.dart';
 import '../service/parties_service.dart';
 
 final partiesViewModelProvider =
-StateNotifierProvider<PartiesViewModel, PartiesState>(
-      (ref) => PartiesViewModel(PartiesService()),
+    StateNotifierProvider<PartiesViewModel, PartiesState>(
+  (ref) {
+    ref.watch(currentUserIdProvider);
+    return PartiesViewModel(PartiesService());
+  },
 );
 
 class PartiesState {
@@ -62,7 +67,7 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
       );
     } catch (e) {
       debugPrint('[PartiesViewModel] error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 
@@ -111,7 +116,7 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
       return true;
     } catch (e) {
       debugPrint('[PartiesViewModel] createParty error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -146,7 +151,7 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
       return true;
     } catch (e) {
       debugPrint('[PartiesViewModel] updateParty error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -158,7 +163,7 @@ class PartiesViewModel extends StateNotifier<PartiesState> {
       return true;
     } catch (e) {
       debugPrint('[PartiesViewModel] deleteParty error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }

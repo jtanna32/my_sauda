@@ -15,13 +15,13 @@ class BillsScreen extends ConsumerStatefulWidget {
 }
 
 class _BillsScreenState extends ConsumerState<BillsScreen> {
-  BillSide? _sideFilter;
-
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(billsViewModelProvider.notifier).loadBills();
+      final vm = ref.read(billsViewModelProvider.notifier);
+      vm.searchBills('');
+      vm.loadBills();
     });
   }
 
@@ -34,8 +34,9 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
   Future<void> _share(Bill bill) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final pdf = await ref.read(billsRepositoryProvider).readPdf(bill);
-      await Printing.sharePdf(bytes: pdf, filename: bill.pdfFileName);
+      final pdf =
+          await ref.read(billsViewModelProvider.notifier).buildPdf(bill);
+      await Printing.sharePdf(bytes: pdf, filename: bill.sharePdfFileName);
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(
@@ -78,9 +79,12 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
 
     if (!mounted) return;
 
+    final failure = ref.read(billsViewModelProvider).errorMessage ??
+        'Failed to delete bill';
+
     messenger.showSnackBar(
       SnackBar(
-        content: Text(success ? 'Bill deleted' : 'Failed to delete bill'),
+        content: Text(success ? 'Bill deleted' : failure),
         backgroundColor: success ? AppTheme.primaryColor : AppTheme.errorColor,
       ),
     );
@@ -89,9 +93,7 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(billsViewModelProvider);
-    final bills = _sideFilter == null
-        ? state.bills
-        : state.bills.where((b) => b.side == _sideFilter).toList();
+    final bills = state.bills;
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -112,23 +114,34 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                _filterChip('All', null),
-                const SizedBox(width: 8),
-                _filterChip('Buyer', BillSide.buyer),
-                const SizedBox(width: 8),
-                _filterChip('Seller', BillSide.seller),
-              ],
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search by bill number or party...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: AppTheme.surfaceColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (value) =>
+                  ref.read(billsViewModelProvider.notifier).searchBills(value),
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: state.isLoading && state.bills.isEmpty
+              child: state.isLoading && state.allBills.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : state.errorMessage != null && state.bills.isEmpty
+                  : state.errorMessage != null && state.allBills.isEmpty
                       ? Center(child: Text(state.errorMessage!))
                       : bills.isEmpty
-                          ? const Center(child: Text('No bills generated yet'))
+                          ? Center(
+                              child: Text(
+                                state.searchQuery.trim().isNotEmpty
+                                    ? 'No bills match your search'
+                                    : 'No bills generated yet',
+                              ),
+                            )
                           : ListView.separated(
                               itemCount: bills.length,
                               separatorBuilder: (_, __) =>
@@ -140,15 +153,6 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _filterChip(String label, BillSide? side) {
-    return ChoiceChip(
-      label: Text(label),
-      selected: _sideFilter == side,
-      selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-      onSelected: (_) => setState(() => _sideFilter = side),
     );
   }
 
@@ -177,33 +181,10 @@ class _BillsScreenState extends ConsumerState<BillsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        bill.billNumber,
-                        style: textTheme.bodyLarge!
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          bill.side.label,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    bill.billNumber,
+                    style: textTheme.bodyLarge!
+                        .copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   Text(

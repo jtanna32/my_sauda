@@ -7,7 +7,7 @@ import '../model/bill_format.dart';
 Future<List<Sauda>?> showAddSaudasSheet({
   required BuildContext context,
   required List<Sauda> saudas,
-  required BillSide side,
+  required BillLine Function(Sauda) lineFor,
 }) {
   return showModalBottomSheet<List<Sauda>>(
     context: context,
@@ -16,15 +16,15 @@ Future<List<Sauda>?> showAddSaudasSheet({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => _AddSaudasContent(saudas: saudas, side: side),
+    builder: (_) => _AddSaudasContent(saudas: saudas, lineFor: lineFor),
   );
 }
 
 class _AddSaudasContent extends StatefulWidget {
   final List<Sauda> saudas;
-  final BillSide side;
+  final BillLine Function(Sauda) lineFor;
 
-  const _AddSaudasContent({required this.saudas, required this.side});
+  const _AddSaudasContent({required this.saudas, required this.lineFor});
 
   @override
   State<_AddSaudasContent> createState() => _AddSaudasContentState();
@@ -61,7 +61,7 @@ class _AddSaudasContentState extends State<_AddSaudasContent> {
                     itemCount: widget.saudas.length,
                     itemBuilder: (context, index) {
                       final sauda = widget.saudas[index];
-                      final line = BillLine.fromSauda(sauda, widget.side);
+                      final line = widget.lineFor(sauda);
                       return CheckboxListTile(
                         value: _selected.contains(sauda.id),
                         activeColor: AppTheme.primaryColor,

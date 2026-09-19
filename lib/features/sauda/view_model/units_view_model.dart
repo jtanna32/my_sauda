@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/unit.dart';
 import '../service/units_service.dart';
 
 final unitsViewModelProvider =
     StateNotifierProvider<UnitsViewModel, UnitsState>(
-  (ref) => UnitsViewModel(UnitsService()),
+  (ref) {
+    ref.watch(currentUserIdProvider);
+    return UnitsViewModel(UnitsService());
+  },
 );
 
 class UnitsState {
@@ -44,7 +49,7 @@ class UnitsViewModel extends StateNotifier<UnitsState> {
       state = state.copyWith(isLoading: false, units: units);
     } catch (e) {
       debugPrint('[UnitsViewModel] loadUnits error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 

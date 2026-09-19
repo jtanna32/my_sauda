@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/item.dart';
 import '../service/items_service.dart';
 
 final itemsViewModelProvider =
     StateNotifierProvider<ItemsViewModel, ItemsState>(
-  (ref) => ItemsViewModel(ItemsService()),
+  (ref) {
+    ref.watch(currentUserIdProvider);
+    return ItemsViewModel(ItemsService());
+  },
 );
 
 class ItemsState {
@@ -44,7 +49,7 @@ class ItemsViewModel extends StateNotifier<ItemsState> {
       state = state.copyWith(isLoading: false, items: items);
     } catch (e) {
       debugPrint('[ItemsViewModel] loadItems error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 
@@ -56,7 +61,7 @@ class ItemsViewModel extends StateNotifier<ItemsState> {
       return item;
     } catch (e) {
       debugPrint('[ItemsViewModel] createItem error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return null;
     }
   }
@@ -68,7 +73,7 @@ class ItemsViewModel extends StateNotifier<ItemsState> {
       return true;
     } catch (e) {
       debugPrint('[ItemsViewModel] deleteItem error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }

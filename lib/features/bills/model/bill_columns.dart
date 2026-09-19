@@ -60,9 +60,9 @@ final List<BillColumn> billColumns = [
   BillColumn(
     key: 'saleRate',
     header: (_) => 'Sale Rate/Qtl',
-    value: (l) => l.saleRatePerQuintal == null
-        ? '-'
-        : formatBillAmount(l.saleRatePerQuintal!),
+    value: (l) => l.numericSaleRate != null
+        ? formatBillAmount(l.numericSaleRate!)
+        : _dash(l.saleRate ?? ''),
     alignRight: true,
   ),
   BillColumn(

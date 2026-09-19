@@ -1,4 +1,6 @@
 import 'package:go_router/go_router.dart';
+import 'package:my_sauda/config/auth_refresh_listenable.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:my_sauda/features/auth/view/forgot_password_screen.dart';
 import 'package:my_sauda/features/auth/view/home_screen.dart';
 import 'package:my_sauda/features/auth/view/login_screen.dart';
@@ -19,8 +21,23 @@ import 'package:my_sauda/features/sauda/model/sauda.dart';
 import 'package:my_sauda/features/sauda/view/saudas_list_screen.dart';
 import 'package:my_sauda/features/sauda/view/add_edit_sauda_screen.dart';
 
+const _publicRoutes = {'/login', '/register', '/forgot-password'};
+
+String? authRedirect({required bool hasSession, required String location}) {
+  final isPublic = _publicRoutes.contains(location);
+  if (!hasSession && !isPublic) return '/login';
+  if (hasSession && isPublic) return '/home';
+  return null;
+}
+
 final router = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/home',
+  refreshListenable:
+      AuthRefreshListenable(Supabase.instance.client.auth.onAuthStateChange),
+  redirect: (context, state) => authRedirect(
+    hasSession: Supabase.instance.client.auth.currentSession != null,
+    location: state.matchedLocation,
+  ),
   routes: [
     GoRoute(
       path: '/login',
@@ -45,10 +62,11 @@ final router = GoRouter(
     GoRoute(
       path: '/add-party',
       builder: (context, state) {
-        final extra = state.extra as Party?;
+        final extra = state.extra;
 
         return AddEditPartyScreen(
-          party: extra,
+          party: extra is Party ? extra : null,
+          initialName: extra is String ? extra : null,
         );
       },
     ),

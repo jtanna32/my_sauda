@@ -56,12 +56,14 @@ class _PartiesListScreenState
 
     if (!mounted) return;
 
+    final failure = ref.read(partiesViewModelProvider).errorMessage ??
+        'Failed to delete party';
+    if (!success) vm.clearMessages();
+
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          success
-              ? 'Party deleted successfully'
-              : 'Failed to delete party',
+          success ? 'Party deleted successfully' : failure,
         ),
         backgroundColor:
         success ? AppTheme.primaryColor : AppTheme.errorColor,

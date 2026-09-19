@@ -1,13 +1,11 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_sauda/features/bills/model/bill.dart';
 import 'package:my_sauda/features/bills/model/bill_calculator.dart';
+import 'package:my_sauda/features/bills/model/bill_columns.dart';
 import 'package:my_sauda/features/bills/model/bill_firm.dart';
 import 'package:my_sauda/features/bills/model/bill_format.dart';
 import 'package:my_sauda/features/bills/model/sauda_matcher.dart';
 import 'package:my_sauda/features/bills/service/bill_pdf_service.dart';
-import 'package:my_sauda/features/bills/service/local_bills_repository.dart';
 import 'package:my_sauda/features/sauda/model/sauda.dart';
 
 Sauda sauda({
@@ -19,6 +17,7 @@ Sauda sauda({
   String unit = 'Ton',
   double? buyerRate = 10,
   double? sellerRate = 4,
+  String rate = '2500',
   DateTime? date,
 }) {
   return Sauda(
@@ -31,7 +30,7 @@ Sauda sauda({
     quantity: quantity,
     unitId: 'un',
     unitName: unit,
-    ratePerQuintal: 2500,
+    ratePerQuintal: rate,
     buyerPartyId: buyer,
     buyerPartyName: 'Buyer $buyer',
     buyerBrokerageRate: buyerRate,
@@ -49,7 +48,6 @@ Bill makeBill(String number, BillSide side, {String userId = 'u1'}) {
   return Bill.create(
     billNumber: number,
     userId: userId,
-    side: side,
     partyId: 'A',
     partyName: 'Party A',
     partyCode: 'PA',
@@ -119,6 +117,82 @@ void main() {
       expect(line.matchesQuery('  '), isTrue);
     });
 
+    test('a text rate is kept as typed and never used in brokerage', () {
+      final line =
+          BillLine.fromSauda(sauda(rate: 'Rate multiple'), BillSide.buyer);
+      expect(line.saleRate, 'Rate multiple');
+      expect(line.numericSaleRate, isNull);
+      expect(line.brokerageAmount, 2500);
+      expect(billColumns.firstWhere((c) => c.key == 'saleRate').value(line),
+          'Rate multiple');
+    });
+
+    test('party GSTIN comes with the sauda join', () {
+      final sauda = Sauda.fromJson({
+        'id': 's',
+        'user_id': 'u',
+        'sauda_number': 'S-1',
+        'sauda_date': '2026-01-10',
+        'item_id': 'i',
+        'quantity': 1,
+        'unit_id': 'un',
+        'rate_per_quintal': 100,
+        'buyer_party_id': 'A',
+        'buyer_party': {
+          'party_name': 'Buyer A',
+          'pan_gstin': '27AAACA1234A1Z5'
+        },
+        'buyer_side_brokerage': 0,
+        'seller_party_id': 'B',
+        'seller_party': {'party_name': 'Seller B'},
+        'seller_side_brokerage': 0,
+        'created_at': '2026-01-10T00:00:00Z',
+      });
+      expect(sauda.buyerPartyGstin, '27AAACA1234A1Z5');
+      expect(sauda.sellerPartyGstin, isNull);
+    });
+
+    test('numeric rate parsing is strict', () {
+      expect(parseNumericRate('4525'), 4525);
+      expect(parseNumericRate(' 4525.50 '), 4525.5);
+      expect(parseNumericRate('45,250'), isNull);
+      expect(parseNumericRate('NaN'), isNull);
+      expect(parseNumericRate('Rate multiple'), isNull);
+      expect(parseNumericRate(''), isNull);
+    });
+
+    test('rate arrives as number or text from the database', () {
+      Sauda parse(dynamic rate) => Sauda.fromJson({
+            'id': 's',
+            'user_id': 'u',
+            'sauda_number': 'S-1',
+            'sauda_date': '2026-01-10',
+            'item_id': 'i',
+            'quantity': 1,
+            'unit_id': 'un',
+            'rate_per_quintal': rate,
+            'buyer_party_id': 'A',
+            'buyer_side_brokerage': 0,
+            'seller_party_id': 'B',
+            'seller_side_brokerage': 0,
+            'created_at': '2026-01-10T00:00:00Z',
+          });
+      expect(parse(4525.0).ratePerQuintal, '4525');
+      expect(parse(4525.5).ratePerQuintal, '4525.5');
+      expect(parse('Rate multiple').ratePerQuintal, 'Rate multiple');
+      expect(parse(4525).rateDisplay, '₹4525.00/qtl');
+      expect(parse('Rate multiple').rateDisplay, 'Rate multiple');
+    });
+
+    test('bills saved with the old numeric rate key still load', () {
+      final json = makeBill('BILL-0001', BillSide.buyer).toJson();
+      final line = (json['lines'] as List).first as Map<String, dynamic>;
+      line
+        ..remove('sale_rate')
+        ..['sale_rate_per_quintal'] = 2500.0;
+      expect(Bill.fromJson(json).lines.first.saleRate, '2500');
+    });
+
     test('Indian amount grouping', () {
       expect(formatBillAmount(2500), '2,500.00');
       expect(formatBillAmount(125000.5), '1,25,000.50');
@@ -132,15 +206,39 @@ void main() {
       sauda(id: '3', buyer: 'C', seller: 'D'),
     ];
 
-    test('a party appears only on the chosen side', () {
+    test('one role only matches that role', () {
       expect(
-        matchSaudas(all, partyId: 'A', side: BillSide.buyer).map((s) => s.id),
+        matchSaudas(all, partyId: 'A', sides: {BillSide.buyer})
+            .map((s) => s.id),
         ['1'],
       );
       expect(
-        matchSaudas(all, partyId: 'A', side: BillSide.seller).map((s) => s.id),
+        matchSaudas(all, partyId: 'A', sides: {BillSide.seller})
+            .map((s) => s.id),
         ['2'],
       );
+    });
+
+    test('both roles match every sauda of the party, oldest first', () {
+      final both = {BillSide.buyer, BillSide.seller};
+      expect(
+        matchSaudas(all, partyId: 'A', sides: both).map((s) => s.id),
+        ['1', '2'],
+      );
+    });
+
+    test('each row gets the rate of the side the party played', () {
+      final s1 =
+          sauda(id: '1', buyer: 'A', seller: 'B', buyerRate: 10, sellerRate: 4);
+      final s2 =
+          sauda(id: '2', buyer: 'C', seller: 'A', buyerRate: 10, sellerRate: 4);
+      final both = {BillSide.buyer, BillSide.seller};
+      final rows = [s1, s2]
+          .map((s) => BillLine.fromSauda(s, sideOfParty(s, 'A', both)!))
+          .toList();
+      expect(rows.map((l) => l.side), [BillSide.buyer, BillSide.seller]);
+      expect(rows.map((l) => l.brokerageRatePerQuintal), [10, 4]);
+      expect(rows.map((l) => l.counterParty), ['Seller B', 'Buyer C']);
     });
   });
 
@@ -167,6 +265,12 @@ void main() {
       expect(Bill.fromJson(json).firm.name, '');
     });
 
+    test('share name is party name plus bill number, extension added once', () {
+      final bill = makeBill('BILL-0007', BillSide.buyer);
+      expect(bill.shareName, 'Party_A_BILL-0007');
+      expect(bill.sharePdfFileName, 'Party_A_BILL-0007.pdf');
+    });
+
     test('PDF builds', () async {
       final pdf =
           await BillPdfService().build(makeBill('BILL-0001', BillSide.seller));
@@ -186,7 +290,6 @@ void main() {
       final bill = Bill.create(
         billNumber: 'BILL-0002',
         userId: 'u1',
-        side: BillSide.buyer,
         partyId: 'A',
         partyName: 'AGT Foods India Pvt Ltd',
         partyCode: 'AGT',
@@ -201,70 +304,29 @@ void main() {
     });
   });
 
-  group('local repository', () {
-    late Directory root;
-    String? user;
-    late LocalBillsRepository repo;
-    final pdf = Uint8List.fromList([1, 2, 3]);
+  // Keeps the model and the create_bill SQL function (which reads these keys) in step.
+  group('create_bill contract', () {
+    final json = makeBill('', BillSide.buyer).toJson();
 
-    setUp(() async {
-      root = await Directory.systemTemp.createTemp('bills_test');
-      user = 'u1';
-      repo = LocalBillsRepository(
-        rootDir: () async => root,
-        currentUserId: () => user,
-      );
-    });
-
-    tearDown(() => root.delete(recursive: true));
-
-    test('numbers are sequential and never reused after delete', () async {
-      expect(await repo.nextBillNumber(), 'BILL-0001');
-      await repo.saveBill(makeBill('BILL-0001', BillSide.buyer), pdf);
-      expect(await repo.nextBillNumber(), 'BILL-0002');
-      final second = makeBill('BILL-0002', BillSide.seller);
-      await repo.saveBill(second, pdf);
-      await repo.deleteBill(second);
-      expect(await repo.nextBillNumber(), 'BILL-0003');
-    });
-
-    test('bills are filed by side and listed newest first', () async {
-      await repo.saveBill(makeBill('BILL-0001', BillSide.buyer), pdf);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      await repo.saveBill(makeBill('BILL-0002', BillSide.seller), pdf);
-
+    test('payload has the keys the SQL function reads', () {
+      expect(json['party_id'], 'A');
+      expect(json['party_name'], 'Party A');
+      expect(DateTime.tryParse(json['bill_date'] as String), isNotNull);
       expect(
-        File('${root.path}/bills/u1/buyers_bill/BILL-0001.json').existsSync(),
-        isTrue,
+        (json['totals'] as Map<String, dynamic>)['total_brokerage'],
+        isA<num>(),
       );
-      expect(
-        File('${root.path}/bills/u1/sellers_bill/BILL-0002.pdf').existsSync(),
-        isTrue,
-      );
-      final list = await repo.listBills();
-      expect(list.map((b) => b.billNumber), ['BILL-0002', 'BILL-0001']);
     });
 
-    test('one user never sees another user\'s bills', () async {
-      await repo.saveBill(makeBill('BILL-0001', BillSide.buyer), pdf);
-      user = 'u2';
-      expect(await repo.listBills(), isEmpty);
-      expect(await repo.nextBillNumber(), 'BILL-0001');
-      user = 'u1';
-      expect(await repo.listBills(), hasLength(1));
+    test('a saved bill comes back with the server-assigned number', () {
+      final saved = Bill.fromJson({...json, 'bill_number': 'BILL-0042'});
+      expect(saved.billNumber, 'BILL-0042');
+      expect(saved.lines, hasLength(1));
+      expect(saved.totals.totalBrokerage, 2500);
     });
 
-    test('logged out throws', () async {
-      user = null;
-      expect(repo.listBills(), throwsStateError);
-    });
-
-    test('pdf can be read back and delete removes both files', () async {
-      final bill = makeBill('BILL-0001', BillSide.buyer);
-      await repo.saveBill(bill, pdf);
-      expect(await repo.readPdf(bill), pdf);
-      await repo.deleteBill(bill);
-      expect(await repo.listBills(), isEmpty);
+    test('an unsaved draft has no bill number yet', () {
+      expect(makeBill('', BillSide.buyer).billNumber, '');
     });
   });
 }

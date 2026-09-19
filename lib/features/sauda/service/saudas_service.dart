@@ -10,8 +10,8 @@ class SaudasService {
     try {
       final response = await _client.from('saudas').select('''
         *,
-        buyer_party:parties!buyer_party_id(id, party_name, party_code, brokerage_rate, delivery_address),
-        seller_party:parties!seller_party_id(id, party_name, party_code, brokerage_rate),
+        buyer_party:parties!buyer_party_id(id, party_name, party_code, brokerage_rate, delivery_address, pan_gstin),
+        seller_party:parties!seller_party_id(id, party_name, party_code, brokerage_rate, pan_gstin),
         item:items!item_id(id, item_name),
         unit:units!unit_id(id, name)
       ''').order('created_at', ascending: false);
@@ -33,7 +33,7 @@ class SaudasService {
     required String unitId,
     String? bagType,
     double? numberOfBags,
-    required double ratePerQuintal,
+    required String ratePerQuintal,
     required String buyerPartyId,
     required double buyerSideBrokerage,
     required String sellerPartyId,
@@ -56,7 +56,8 @@ class SaudasService {
         'p_unit_id': unitId,
         'p_bag_type': bagType,
         'p_number_of_bags': numberOfBags,
-        'p_rate_per_quintal': ratePerQuintal,
+        'p_rate_per_quintal':
+            parseNumericRate(ratePerQuintal) ?? ratePerQuintal,
         'p_buyer_party_id': buyerPartyId,
         'p_buyer_side_brokerage': buyerSideBrokerage,
         'p_seller_party_id': sellerPartyId,
@@ -87,7 +88,7 @@ class SaudasService {
     required String unitId,
     String? bagType,
     double? numberOfBags,
-    required double ratePerQuintal,
+    required String ratePerQuintal,
     required String buyerPartyId,
     required double buyerSideBrokerage,
     required String sellerPartyId,
@@ -111,7 +112,8 @@ class SaudasService {
         'p_unit_id': unitId,
         'p_bag_type': bagType,
         'p_number_of_bags': numberOfBags,
-        'p_rate_per_quintal': ratePerQuintal,
+        'p_rate_per_quintal':
+            parseNumericRate(ratePerQuintal) ?? ratePerQuintal,
         'p_buyer_party_id': buyerPartyId,
         'p_buyer_side_brokerage': buyerSideBrokerage,
         'p_seller_party_id': sellerPartyId,

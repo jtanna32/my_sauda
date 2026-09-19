@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:my_sauda/core/theme/app_theme.dart';
+import 'package:my_sauda/features/auth/service/auth_service.dart';
+import 'package:my_sauda/features/auth/view_model/auth_view_model.dart';
 import 'package:my_sauda/features/firms/view_model/firms_view_model.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -15,9 +17,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
       ref.read(firmsViewModelProvider.notifier).loadFirms();
+      // A restored session skips the login screen, which is where the profile row is normally created.
+      try {
+        await AuthService.instance.ensureProfile();
+      } catch (e) {
+        debugPrint('[HomeScreen] ensureProfile failed: $e');
+      }
     });
+  }
+
+  Future<void> _confirmLogout() async {
+    final email = AuthService.instance.currentEmail;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out'),
+        content: Text(
+          email == null
+              ? 'Are you sure you want to log out?'
+              : 'Are you sure you want to log out of $email?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorColor,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 0),
+              child: Text('Log out'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final success = await ref.read(authViewModelProvider.notifier).logout();
+
+    if (success) {
+      router.go('/login');
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not log out. Please try again.'),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _showLocked() {
@@ -40,6 +98,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('My Sauda'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Log out',
+            onPressed: _confirmLogout,
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),

@@ -19,10 +19,10 @@ class _Col {
 }
 
 String _buyerOf(BillLine l, Bill b) =>
-    b.side == BillSide.buyer ? b.partyName : l.counterParty;
+    l.side == BillSide.buyer ? b.partyName : l.counterParty;
 
 String _sellerOf(BillLine l, Bill b) =>
-    b.side == BillSide.seller ? b.partyName : l.counterParty;
+    l.side == BillSide.seller ? b.partyName : l.counterParty;
 
 // Column order and widths follow the broker's printed bill; widths add up to the A4 content width.
 final List<_Col> _cols = [
@@ -34,10 +34,10 @@ final List<_Col> _cols = [
   _Col('Weight\n(ton)', 46, pw.Alignment.topLeft,
       (l, b, n) => l.quantityTons.toStringAsFixed(3)),
   _Col('Rate', 52, pw.Alignment.topLeft, (l, b, n) {
-    final rate = l.saleRatePerQuintal;
-    return rate == null
-        ? '-'
-        : formatBillAmount(BillCalculator.ratePerTon(rate));
+    final rate = l.numericSaleRate;
+    if (rate != null) return formatBillAmount(BillCalculator.ratePerTon(rate));
+    final text = l.saleRate ?? '';
+    return text.isEmpty ? '-' : text;
   }),
   _Col('Buyer', 96, pw.Alignment.topLeft, (l, b, n) => _buyerOf(l, b)),
   _Col('Seller', 86, pw.Alignment.topCenter, (l, b, n) => _sellerOf(l, b)),

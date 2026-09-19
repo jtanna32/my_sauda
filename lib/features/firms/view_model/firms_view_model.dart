@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/firm.dart';
 import '../service/firms_service.dart';
 
 final firmsViewModelProvider =
     StateNotifierProvider<FirmsViewModel, FirmsState>(
-  (ref) => FirmsViewModel(FirmsService()),
+  (ref) {
+    ref.watch(currentUserIdProvider);
+    return FirmsViewModel(FirmsService());
+  },
 );
 
 class FirmsState {
@@ -61,7 +66,7 @@ class FirmsViewModel extends StateNotifier<FirmsState> {
       );
     } catch (e) {
       debugPrint('[FirmsViewModel] loadFirms error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 
@@ -114,7 +119,7 @@ class FirmsViewModel extends StateNotifier<FirmsState> {
       return true;
     } catch (e) {
       debugPrint('[FirmsViewModel] error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -155,7 +160,7 @@ class FirmsViewModel extends StateNotifier<FirmsState> {
       return true;
     } catch (e) {
       debugPrint('[FirmsViewModel] error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }
@@ -167,7 +172,7 @@ class FirmsViewModel extends StateNotifier<FirmsState> {
       return true;
     } catch (e) {
       debugPrint('[FirmsViewModel] deleteFirm error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }

@@ -1,3 +1,18 @@
+// The rate is free text ("4525", "Rate multiple"); only a plain number counts as numeric.
+double? parseNumericRate(String? text) {
+  final t = text?.trim() ?? '';
+  return RegExp(r'^\d+(\.\d+)?$').hasMatch(t) ? double.parse(t) : null;
+}
+
+// Numeric columns arrive as numbers, text columns as strings.
+String _rateFromJson(dynamic value) {
+  if (value == null) return '';
+  if (value is num) {
+    return value % 1 == 0 ? value.toInt().toString() : value.toString();
+  }
+  return value.toString();
+}
+
 class Sauda {
   final String id;
   final String userId;
@@ -14,17 +29,19 @@ class Sauda {
   final String? bagType;
   final double? numberOfBags;
 
-  final double ratePerQuintal;
+  final String ratePerQuintal;
 
   final String buyerPartyId;
   final String? buyerPartyName;
   final String? buyerPartyCode;
+  final String? buyerPartyGstin;
   final double? buyerBrokerageRate;
   final double buyerSideBrokerage;
 
   final String sellerPartyId;
   final String? sellerPartyName;
   final String? sellerPartyCode;
+  final String? sellerPartyGstin;
   final double? sellerBrokerageRate;
   final double sellerSideBrokerage;
 
@@ -56,11 +73,13 @@ class Sauda {
     required this.buyerPartyId,
     this.buyerPartyName,
     this.buyerPartyCode,
+    this.buyerPartyGstin,
     this.buyerBrokerageRate,
     required this.buyerSideBrokerage,
     required this.sellerPartyId,
     this.sellerPartyName,
     this.sellerPartyCode,
+    this.sellerPartyGstin,
     this.sellerBrokerageRate,
     required this.sellerSideBrokerage,
     this.quantityRemarks,
@@ -73,6 +92,12 @@ class Sauda {
     required this.createdAt,
     this.updatedAt,
   });
+
+  double? get numericRate => parseNumericRate(ratePerQuintal);
+
+  String get rateDisplay => numericRate == null
+      ? ratePerQuintal
+      : '₹${numericRate!.toStringAsFixed(2)}/qtl';
 
   factory Sauda.fromJson(Map<String, dynamic> json) {
     final buyer = json['buyer_party'] as Map<String, dynamic>?;
@@ -94,10 +119,11 @@ class Sauda {
       numberOfBags: json['number_of_bags'] != null
           ? (json['number_of_bags'] as num).toDouble()
           : null,
-      ratePerQuintal: (json['rate_per_quintal'] as num).toDouble(),
+      ratePerQuintal: _rateFromJson(json['rate_per_quintal']),
       buyerPartyId: json['buyer_party_id'],
       buyerPartyName: buyer?['party_name'],
       buyerPartyCode: buyer?['party_code'],
+      buyerPartyGstin: buyer?['pan_gstin'],
       buyerBrokerageRate: buyer?['brokerage_rate'] != null
           ? (buyer!['brokerage_rate'] as num).toDouble()
           : null,
@@ -105,6 +131,7 @@ class Sauda {
       sellerPartyId: json['seller_party_id'],
       sellerPartyName: seller?['party_name'],
       sellerPartyCode: seller?['party_code'],
+      sellerPartyGstin: seller?['pan_gstin'],
       sellerBrokerageRate: seller?['brokerage_rate'] != null
           ? (seller!['brokerage_rate'] as num).toDouble()
           : null,
@@ -135,15 +162,17 @@ class Sauda {
     String? unitName,
     String? bagType,
     double? numberOfBags,
-    double? ratePerQuintal,
+    String? ratePerQuintal,
     String? buyerPartyId,
     String? buyerPartyName,
     String? buyerPartyCode,
+    String? buyerPartyGstin,
     double? buyerBrokerageRate,
     double? buyerSideBrokerage,
     String? sellerPartyId,
     String? sellerPartyName,
     String? sellerPartyCode,
+    String? sellerPartyGstin,
     double? sellerBrokerageRate,
     double? sellerSideBrokerage,
     String? quantityRemarks,
@@ -172,11 +201,13 @@ class Sauda {
       buyerPartyId: buyerPartyId ?? this.buyerPartyId,
       buyerPartyName: buyerPartyName ?? this.buyerPartyName,
       buyerPartyCode: buyerPartyCode ?? this.buyerPartyCode,
+      buyerPartyGstin: buyerPartyGstin ?? this.buyerPartyGstin,
       buyerBrokerageRate: buyerBrokerageRate ?? this.buyerBrokerageRate,
       buyerSideBrokerage: buyerSideBrokerage ?? this.buyerSideBrokerage,
       sellerPartyId: sellerPartyId ?? this.sellerPartyId,
       sellerPartyName: sellerPartyName ?? this.sellerPartyName,
       sellerPartyCode: sellerPartyCode ?? this.sellerPartyCode,
+      sellerPartyGstin: sellerPartyGstin ?? this.sellerPartyGstin,
       sellerBrokerageRate: sellerBrokerageRate ?? this.sellerBrokerageRate,
       sellerSideBrokerage: sellerSideBrokerage ?? this.sellerSideBrokerage,
       quantityRemarks: quantityRemarks ?? this.quantityRemarks,

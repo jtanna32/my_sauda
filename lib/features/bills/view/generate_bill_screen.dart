@@ -73,11 +73,11 @@ class GenerateBillScreen extends ConsumerWidget {
               onTap: () => _pickParty(context, ref),
             ),
             const SizedBox(height: 20),
-            _label(context, 'Bill for the party as'),
+            _label(context, 'Include saudas where the party is'),
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<BillSide>(
-                emptySelectionAllowed: true,
+                multiSelectionEnabled: true,
                 showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(
@@ -89,11 +89,19 @@ class GenerateBillScreen extends ConsumerWidget {
                     label: Text('Seller'),
                   ),
                 ],
-                selected: {if (state.side != null) state.side!},
-                onSelectionChanged: (s) {
-                  if (s.isNotEmpty) vm.setSide(s.first);
-                },
+                selected: state.sides,
+                onSelectionChanged: vm.setSides,
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              state.sides.length == 2
+                  ? 'Every sauda where the party is buyer or seller goes on one bill.'
+                  : 'Only saudas where the party is the ${state.sides.first.label.toLowerCase()}.',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                  ),
             ),
             const SizedBox(height: 20),
             _label(context, 'Date range (optional)'),

@@ -1,13 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart' show DateTimeRange;
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/features/bills/model/bill_calculator.dart';
 import 'package:my_sauda/features/parties/model/party.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/sauda.dart';
 import '../service/saudas_service.dart';
 
 final saudasViewModelProvider =
     StateNotifierProvider<SaudasViewModel, SaudasState>(
-  (ref) => SaudasViewModel(SaudasService()),
+  (ref) {
+    ref.watch(currentUserIdProvider);
+    return SaudasViewModel(SaudasService());
+  },
 );
 
 class SaudasState {
@@ -27,6 +33,35 @@ class SaudasState {
       partyFilter != null ||
       buyerFilter != null ||
       sellerFilter != null;
+
+  double get totalTons => saudas.fold<double>(
+        0,
+        (sum, s) =>
+            sum +
+            BillCalculator.toTons(
+              BillCalculator.toQuintals(s.quantity, s.unitName),
+            ),
+      );
+
+  double get totalBrokerage => BillCalculator.round2(
+      saudas.fold<double>(0, (sum, s) => sum + _brokerageOf(s)));
+
+  // With a party filter only that party's side counts; with only a buyer or seller filter, that side; otherwise both sides.
+  double _brokerageOf(Sauda s) {
+    final party = partyFilter;
+    if (party != null) {
+      if (s.buyerPartyId == party.id) return s.buyerSideBrokerage;
+      if (s.sellerPartyId == party.id) return s.sellerSideBrokerage;
+      return 0;
+    }
+    if (buyerFilter != null && sellerFilter == null) {
+      return s.buyerSideBrokerage;
+    }
+    if (sellerFilter != null && buyerFilter == null) {
+      return s.sellerSideBrokerage;
+    }
+    return s.buyerSideBrokerage + s.sellerSideBrokerage;
+  }
 
   int get activeFilterCount =>
       (dateRangeFilter != null ? 1 : 0) +
@@ -103,7 +138,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
       );
     } catch (e) {
       debugPrint('[SaudasViewModel] loadSaudas error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
     }
   }
 
@@ -182,6 +217,16 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
 
   void clearFilters() => applyFilters();
 
+  void applyCurrentMonthFilter() {
+    final now = DateTime.now();
+    applyFilters(
+      dateRange: DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        end: DateTime(now.year, now.month + 1, 0),
+      ),
+    );
+  }
+
   Future<Sauda?> createSauda({
     required DateTime saudaDate,
     required String itemId,
@@ -190,7 +235,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
     required String unitId,
     String? bagType,
     double? numberOfBags,
-    required double ratePerQuintal,
+    required String ratePerQuintal,
     required String buyerPartyId,
     required double buyerSideBrokerage,
     required String sellerPartyId,
@@ -230,7 +275,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
       return created;
     } catch (e) {
       debugPrint('[SaudasViewModel] createSauda error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return null;
     }
   }
@@ -244,7 +289,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
     required String unitId,
     String? bagType,
     double? numberOfBags,
-    required double ratePerQuintal,
+    required String ratePerQuintal,
     required String buyerPartyId,
     required double buyerSideBrokerage,
     required String sellerPartyId,
@@ -285,7 +330,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
       return updated;
     } catch (e) {
       debugPrint('[SaudasViewModel] updateSauda error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return null;
     }
   }
@@ -297,7 +342,7 @@ class SaudasViewModel extends StateNotifier<SaudasState> {
       return true;
     } catch (e) {
       debugPrint('[SaudasViewModel] deleteSauda error: $e');
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      state = state.copyWith(isLoading: false, errorMessage: friendlyError(e));
       return false;
     }
   }

@@ -8,14 +8,12 @@ const _highlighted = {'date', 'saudaNo', 'item', 'counterParty', 'amount'};
 
 class BillLineCard extends StatelessWidget {
   final BillLine line;
-  final BillSide side;
   final VoidCallback onDelete;
   final VoidCallback onEditRate;
 
   const BillLineCard({
     super.key,
     required this.line,
-    required this.side,
     required this.onDelete,
     required this.onEditRate,
   });
@@ -67,7 +65,7 @@ class BillLineCard extends StatelessWidget {
             child: Text(
               line.counterParty.isEmpty
                   ? line.itemName
-                  : '${line.itemName} · ${side.counterPartyLabel}: ${line.counterParty}',
+                  : '${line.itemName} · ${line.side.counterPartyLabel}: ${line.counterParty}',
               style: textTheme.bodyMedium,
             ),
           ),
@@ -80,7 +78,7 @@ class BillLineCard extends StatelessWidget {
               children: [
                 for (final c in details)
                   Text(
-                    '${c.header(side)}: ${c.value(line)}',
+                    '${c.header(line.side)}: ${c.value(line)}',
                     style: textTheme.bodyMedium!.copyWith(
                       fontSize: 12,
                       color: Colors.grey.shade700,

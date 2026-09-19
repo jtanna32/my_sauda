@@ -9,8 +9,9 @@ import '../model/party.dart';
 
 class AddEditPartyScreen extends ConsumerStatefulWidget {
   final Party? party;
+  final String? initialName;
 
-  const AddEditPartyScreen({super.key, this.party});
+  const AddEditPartyScreen({super.key, this.party, this.initialName});
 
   @override
   ConsumerState<AddEditPartyScreen> createState() => _AddEditPartyScreenState();
@@ -77,7 +78,8 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
 
     final p = widget.party;
 
-    _nameController = TextEditingController(text: p?.partyName ?? '');
+    _nameController =
+        TextEditingController(text: p?.partyName ?? widget.initialName ?? '');
     _brokerageController =
         TextEditingController(text: p?.brokerageRate?.toString() ?? '');
     _panController = TextEditingController(text: p?.panGstin ?? '');
@@ -199,7 +201,16 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
         ),
       );
 
-      context.pop();
+      // Names are unique per user, so the name finds the party that was just created.
+      final name = _nameController.text.trim().toLowerCase();
+      final created = isEdit
+          ? null
+          : ref
+              .read(partiesViewModelProvider)
+              .allParties
+              .where((p) => p.partyName.trim().toLowerCase() == name)
+              .firstOrNull;
+      context.pop(created);
     } else {
       final error = ref.read(partiesViewModelProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -278,9 +289,12 @@ class _AddEditPartyScreenState extends ConsumerState<AddEditPartyScreen> {
               const SizedBox(height: 18),
 
               CustomTextField(
-                label: 'PAN / GSTIN (optional)',
-                hint: 'Enter PAN or GSTIN',
+                label: 'GSTIN',
+                hint: 'Enter GSTIN',
                 controller: _panController,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'GSTIN is required'
+                    : null,
               ),
               const SizedBox(height: 18),
 

@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:my_sauda/core/theme/app_theme.dart';
-import 'package:my_sauda/core/utils/whatsapp_helper.dart';
+import 'package:my_sauda/core/utils/image_share_helper.dart';
+import 'package:my_sauda/core/utils/widget_image.dart';
 import 'package:my_sauda/core/widgets/suggestion_picker_dialog.dart';
 import 'package:my_sauda/features/parties/model/party.dart';
 import 'package:my_sauda/features/sauda/model/item.dart';
 import 'package:my_sauda/features/sauda/model/new_sauda_preset.dart';
 import 'package:my_sauda/features/sauda/model/sauda.dart';
 import 'package:my_sauda/features/sauda/model/unit.dart';
+import 'package:my_sauda/features/sauda/view_model/sauda_defaults_view_model.dart';
 import 'package:my_sauda/features/sauda/view_model/saudas_view_model.dart';
 import 'package:my_sauda/features/sauda/view_model/units_view_model.dart';
 import 'package:my_sauda/features/sauda/widgets/item_picker_dialog.dart';
 import 'package:my_sauda/features/sauda/widgets/party_picker_dialog.dart';
+import 'package:my_sauda/features/sauda/widgets/sauda_share_card.dart';
 
 class AddEditSaudaScreen extends ConsumerStatefulWidget {
   final Sauda? sauda;
@@ -59,6 +62,10 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
   final _deliveryAddressController = TextEditingController();
   final _additionalRemarksController = TextEditingController();
 
+  // Optional details remembered for next time and shown on the shared image
+  final _firmNameController = TextEditingController();
+  final _termsController = TextEditingController();
+
   // Options
   bool _sendToParties = false;
 
@@ -76,6 +83,19 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
       _initializeForEdit();
       _applyPreset();
     });
+    Future.microtask(_loadDefaults);
+  }
+
+  Future<void> _loadDefaults() async {
+    final defaults =
+        await ref.read(saudaDefaultsViewModelProvider.notifier).loadDefaults();
+    if (!mounted) return;
+    if (_firmNameController.text.isEmpty) {
+      _firmNameController.text = defaults.firmName;
+    }
+    if (_termsController.text.isEmpty) {
+      _termsController.text = defaults.terms;
+    }
   }
 
   void _applyPreset() {
@@ -109,7 +129,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     _quantityController.text = s.quantity.toString();
     _bagTypeController.text = s.bagType ?? '';
     _numberOfBagsController.text = s.numberOfBags?.toString() ?? '';
-    _rateController.text = s.ratePerQuintal.toString();
+    _rateController.text = s.ratePerQuintal;
     _buyerBrokerageRateController.text = s.buyerBrokerageRate?.toString() ?? '';
     _buyerSideBrokerageController.text = s.buyerSideBrokerage.toString();
     _sellerBrokerageRateController.text =
@@ -145,6 +165,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         id: s.buyerPartyId,
         userId: '',
         partyCode: s.buyerPartyCode ?? '',
+        panGstin: s.buyerPartyGstin,
         partyName: s.buyerPartyName!,
         brokerageRate: s.buyerBrokerageRate,
         city: '',
@@ -159,6 +180,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         id: s.sellerPartyId,
         userId: '',
         partyCode: s.sellerPartyCode ?? '',
+        panGstin: s.sellerPartyGstin,
         partyName: s.sellerPartyName!,
         brokerageRate: s.sellerBrokerageRate,
         city: '',
@@ -188,6 +210,8 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     _paymentConditionController.dispose();
     _deliveryAddressController.dispose();
     _additionalRemarksController.dispose();
+    _firmNameController.dispose();
+    _termsController.dispose();
     super.dispose();
   }
 
@@ -262,6 +286,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
       context: context,
       ref: ref,
       title: 'Select Buyer',
+      allowAdd: true,
     );
     if (party != null) {
       setState(() {
@@ -280,6 +305,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
       context: context,
       ref: ref,
       title: 'Select Seller',
+      allowAdd: true,
     );
     if (party != null) {
       setState(() {
@@ -322,7 +348,7 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     final vm = ref.read(saudasViewModelProvider.notifier);
 
     final qty = double.parse(_quantityController.text.trim());
-    final rate = double.parse(_rateController.text.trim());
+    final rate = _rateController.text.trim();
     final buyerBrokerage =
         double.tryParse(_buyerSideBrokerageController.text.trim()) ?? 0;
     final sellerBrokerage =
@@ -382,12 +408,17 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     if (!mounted) return;
 
     if (result != null) {
+      await ref.read(saudaDefaultsViewModelProvider.notifier).saveDefaults(
+            firmName: _firmNameController.text,
+            terms: _termsController.text,
+          );
+      if (!mounted) return;
       if (widget.preset != null) {
         context.pop(_createdWithEnteredRates(result));
         return;
       }
       if (_sendToParties) {
-        await _showSendToPartiesSheet(result);
+        await _shareImage(result);
         if (!mounted) return;
       }
       context.pop();
@@ -418,168 +449,82 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
     );
   }
 
-  // Builds the WhatsApp message shown to [partyLabel] ('Buyer' or 'Seller'),
-  // including that party's own brokerage only — never the other side's.
-  String _buildWhatsAppMessage({
-    required Sauda sauda,
-    required String partyLabel,
-    required double ownBrokerage,
-  }) {
-    final buffer = StringBuffer()
-      ..writeln(
-          '*Sauda Confirmation${sauda.saudaNumber.isNotEmpty ? ' - #${sauda.saudaNumber}' : ''}*')
-      ..writeln('Date: ${_formatDate(_saudaDate)}')
-      ..writeln()
-      ..writeln('Item: ${_selectedItem?.name ?? '-'}')
-      ..writeln(
-          'Quantity: ${_quantityController.text.trim()} ${_selectedUnit?.name ?? ''}');
-    if (_bagTypeController.text.trim().isNotEmpty) {
-      buffer.writeln(
-          'Bags: ${_numberOfBagsController.text.trim()} x ${_bagTypeController.text.trim()}');
-    }
-    buffer
-      ..writeln('Rate: ₹${_rateController.text.trim()} / quintal')
-      ..writeln()
-      ..writeln('Buyer: ${_selectedBuyerParty?.partyName ?? '-'}')
-      ..writeln('Seller: ${_selectedSellerParty?.partyName ?? '-'}');
-
-    if (_quantityRemarksController.text.trim().isNotEmpty) {
-      buffer.writeln(
-          'Quantity Remarks: ${_quantityRemarksController.text.trim()}');
-    }
-    if (_specificationController.text.trim().isNotEmpty) {
-      buffer.writeln('Specification: ${_specificationController.text.trim()}');
-    }
-    if (_loadingConditionController.text.trim().isNotEmpty) {
-      buffer.writeln('Loading: ${_loadingConditionController.text.trim()}');
-    }
-    if (_paymentConditionController.text.trim().isNotEmpty) {
-      buffer.writeln('Payment: ${_paymentConditionController.text.trim()}');
-    }
-    if (_deliveryAddressController.text.trim().isNotEmpty) {
-      buffer.writeln(
-          'Delivery Address: ${_deliveryAddressController.text.trim()}');
-    }
-    if (_additionalRemarksController.text.trim().isNotEmpty) {
-      buffer.writeln('Remarks: ${_additionalRemarksController.text.trim()}');
-    }
-
-    buffer
-      ..writeln()
-      ..writeln('Brokerage ($partyLabel): ₹${ownBrokerage.toStringAsFixed(2)}');
-
-    return buffer.toString();
+  String? _gstinLine(Party? party) {
+    final gstin = party?.panGstin?.trim() ?? '';
+    return gstin.isEmpty ? null : 'GSTIN: $gstin';
   }
 
-  Future<void> _sendToParty({
-    required Party? party,
-    required String partyLabel,
-    required Sauda sauda,
-    required double ownBrokerage,
-  }) async {
-    if (party == null) return;
-    final message = _buildWhatsAppMessage(
-      sauda: sauda,
-      partyLabel: partyLabel,
-      ownBrokerage: ownBrokerage,
-    );
-    final sent = await WhatsAppHelper.sendMessage(
-      phoneNumber: party.phoneNumber,
-      message: message,
-    );
-    if (!mounted) return;
-    if (!sent) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          party.phoneNumber == null || party.phoneNumber!.trim().isEmpty
-              ? 'No phone number on file for ${party.partyName}.'
-              : 'Could not open WhatsApp for ${party.partyName}.',
-        ),
-        backgroundColor: AppTheme.errorColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  Future<void> _showSendToPartiesSheet(Sauda sauda) async {
-    final buyerBrokerage =
-        double.tryParse(_buyerSideBrokerageController.text.trim()) ?? 0;
-    final sellerBrokerage =
-        double.tryParse(_sellerSideBrokerageController.text.trim()) ?? 0;
-
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  // One image goes to both parties, so it carries no brokerage.
+  List<ShareRow> _shareRows() {
+    final rows = <ShareRow>[
+      ShareRow(label: 'Item', value: _selectedItem?.name ?? '-'),
+      ShareRow(
+        label: 'Quantity',
+        value: '${_quantityController.text.trim()} ${_selectedUnit?.name ?? ''}'
+            .trim(),
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Send Sauda Details',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontSize: 18,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap a party to open WhatsApp with the details pre-filled.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    child: Icon(Icons.chat),
-                  ),
-                  title: Text(_selectedBuyerParty?.partyName ?? 'Buyer'),
-                  subtitle: Text(
-                      _selectedBuyerParty?.phoneNumber ?? 'No phone number'),
-                  onTap: () => _sendToParty(
-                    party: _selectedBuyerParty,
-                    partyLabel: 'Buyer',
-                    sauda: sauda,
-                    ownBrokerage: buyerBrokerage,
-                  ),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    child: Icon(Icons.chat),
-                  ),
-                  title: Text(_selectedSellerParty?.partyName ?? 'Seller'),
-                  subtitle: Text(
-                      _selectedSellerParty?.phoneNumber ?? 'No phone number'),
-                  onTap: () => _sendToParty(
-                    party: _selectedSellerParty,
-                    partyLabel: 'Seller',
-                    sauda: sauda,
-                    ownBrokerage: sellerBrokerage,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(sheetContext),
-                    child: const Text('Done'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      if (_bagTypeController.text.trim().isNotEmpty)
+        ShareRow(
+          label: 'Bags',
+          value:
+              '${_numberOfBagsController.text.trim()} x ${_bagTypeController.text.trim()}',
+        ),
+      ShareRow(
+        label: 'Rate',
+        value: parseNumericRate(_rateController.text) == null
+            ? _rateController.text.trim()
+            : '₹${_rateController.text.trim()} / quintal',
+      ),
+      ShareRow(
+        label: 'Buyer',
+        value: _selectedBuyerParty?.partyName ?? '-',
+        detail: _gstinLine(_selectedBuyerParty),
+      ),
+      ShareRow(
+        label: 'Seller',
+        value: _selectedSellerParty?.partyName ?? '-',
+        detail: _gstinLine(_selectedSellerParty),
+      ),
+    ];
+
+    void addIfFilled(String label, TextEditingController controller) {
+      final value = controller.text.trim();
+      if (value.isNotEmpty) rows.add(ShareRow(label: label, value: value));
+    }
+
+    addIfFilled('Quantity Remarks', _quantityRemarksController);
+    addIfFilled('Specification', _specificationController);
+    addIfFilled('Loading', _loadingConditionController);
+    addIfFilled('Payment', _paymentConditionController);
+    addIfFilled('Delivery Address', _deliveryAddressController);
+    addIfFilled('Remarks', _additionalRemarksController);
+    return rows;
+  }
+
+  Future<void> _shareImage(Sauda sauda) async {
+    final card = SaudaShareCard(
+      title:
+          'Sauda Confirmation${sauda.saudaNumber.isNotEmpty ? ' - #${sauda.saudaNumber}' : ''}',
+      date: _formatDate(_saudaDate),
+      rows: _shareRows(),
+      firmName: _nullIfEmpty(_firmNameController.text),
+      terms: _nullIfEmpty(_termsController.text),
     );
+
+    try {
+      final png = await renderWidgetToPng(context, card);
+      if (!mounted) return;
+      await ImageShareHelper.shareImage(
+        context: context,
+        bytes: png,
+        fileName:
+            'sauda_${sauda.saudaNumber.isEmpty ? sauda.id : sauda.saudaNumber}.png',
+      );
+    } catch (e) {
+      debugPrint('[AddEditSaudaScreen] share image error: $e');
+      if (!mounted) return;
+      _showError('Could not create the image. Please try again.');
+    }
   }
 
   void _showError(String message) {
@@ -618,7 +563,8 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
         child: TextFormField(
           decoration: InputDecoration(
             labelText: label,
-            suffixIcon: onTap == null ? null : const Icon(Icons.arrow_drop_down),
+            suffixIcon:
+                onTap == null ? null : const Icon(Icons.arrow_drop_down),
           ),
           controller: TextEditingController(text: value ?? ''),
           validator: required
@@ -713,6 +659,17 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
 
               // ── Contract Details ──────────────────────────
               _sectionHeader('Contract Details'),
+
+              TextFormField(
+                controller: _firmNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Firm Name (optional)',
+                ),
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+              ),
+
+              const SizedBox(height: 14),
 
               GestureDetector(
                 onTap: _pickDate,
@@ -841,17 +798,13 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
 
               TextFormField(
                 controller: _rateController,
-                decoration:
-                    const InputDecoration(labelText: 'Rate per Quintal (₹) *'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  if (double.tryParse(v.trim()) == null) {
-                    return 'Invalid number';
-                  }
-                  return null;
-                },
+                decoration: const InputDecoration(
+                  labelText: 'Rate per Quintal (₹) *',
+                  hintText: 'e.g. 4525',
+                ),
+                textCapitalization: TextCapitalization.sentences,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
 
               // ── Buyer ─────────────────────────────────────
@@ -1002,6 +955,21 @@ class _AddEditSaudaScreenState extends ConsumerState<AddEditSaudaScreen> {
                 maxLines: 3,
                 keyboardType: TextInputType.text,
                 textInputAction: TextInputAction.done,
+                onTapOutside: (_) =>
+                    FocusManager.instance.primaryFocus?.unfocus(),
+              ),
+
+              const SizedBox(height: 14),
+
+              TextFormField(
+                controller: _termsController,
+                decoration: const InputDecoration(
+                  labelText: 'Terms & Conditions (optional)',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 5,
+                textCapitalization: TextCapitalization.sentences,
+                keyboardType: TextInputType.multiline,
                 onTapOutside: (_) =>
                     FocusManager.instance.primaryFocus?.unfocus(),
               ),

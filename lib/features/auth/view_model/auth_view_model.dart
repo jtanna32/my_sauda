@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../service/auth_service.dart';
 
 final authViewModelProvider = StateNotifierProvider<AuthViewModel, AuthState>(
@@ -59,16 +60,9 @@ class AuthViewModel extends StateNotifier<AuthState> {
 
       return true;
     } catch (error) {
-      String message = error.toString();
-
-      // 🔥 Handle common Supabase error
-      if (message.contains('Email not confirmed')) {
-        message = 'Please verify your email before logging in.';
-      }
-
       state = state.copyWith(
         isLoading: false,
-        errorMessage: message,
+        errorMessage: friendlyError(error),
       );
 
       return false;
@@ -106,7 +100,7 @@ class AuthViewModel extends StateNotifier<AuthState> {
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage: friendlyError(error),
       );
 
       return false;
@@ -135,9 +129,21 @@ class AuthViewModel extends StateNotifier<AuthState> {
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: error.toString(),
+        errorMessage: friendlyError(error),
       );
 
+      return false;
+    }
+  }
+
+  // 🚪 LOGOUT
+  Future<bool> logout() async {
+    try {
+      await AuthService.instance.logout();
+      state = const AuthState();
+      return true;
+    } catch (error) {
+      state = state.copyWith(errorMessage: friendlyError(error));
       return false;
     }
   }

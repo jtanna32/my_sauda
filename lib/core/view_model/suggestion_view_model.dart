@@ -1,9 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:my_sauda/features/auth/view_model/current_user_provider.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../service/suggestion_service.dart';
 
 final suggestionViewModelProvider = StateNotifierProvider.family<
     SuggestionViewModel, SuggestionState, String>(
-      (ref, type) => SuggestionViewModel(type),
+      (ref, type) {
+    ref.watch(currentUserIdProvider);
+    return SuggestionViewModel(type);
+  },
 );
 
 class SuggestionState {
@@ -60,7 +65,7 @@ class SuggestionViewModel extends StateNotifier<SuggestionState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: e.toString(),
+        error: friendlyError(e),
       );
     }
   }

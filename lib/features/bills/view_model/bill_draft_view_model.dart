@@ -6,21 +6,20 @@ import 'package:my_sauda/features/firms/model/firm.dart';
 import 'package:my_sauda/features/parties/model/party.dart';
 import 'package:my_sauda/features/sauda/model/sauda.dart';
 import 'package:my_sauda/features/sauda/view_model/saudas_view_model.dart';
+import 'package:my_sauda/core/utils/error_message.dart';
 import '../model/bill.dart';
 import '../model/bill_firm.dart';
 import '../model/sauda_matcher.dart';
-import '../service/bill_pdf_service.dart';
-import '../service/bills_repository.dart';
 import 'bills_view_model.dart';
 
 final billDraftViewModelProvider =
     StateNotifierProvider.autoDispose<BillDraftViewModel, BillDraftState>(
-  (ref) => BillDraftViewModel(ref, ref.read(billsRepositoryProvider)),
+  (ref) => BillDraftViewModel(ref),
 );
 
 class BillDraftState {
   final Party? party;
-  final BillSide? side;
+  final Set<BillSide> sides;
   final DateTimeRange? dateRange;
   final bool isGenerating;
   final bool isPrinting;
@@ -30,7 +29,7 @@ class BillDraftState {
 
   const BillDraftState({
     this.party,
-    this.side,
+    this.sides = const {BillSide.buyer, BillSide.seller},
     this.dateRange,
     this.isGenerating = false,
     this.isPrinting = false,
@@ -39,7 +38,7 @@ class BillDraftState {
     this.errorMessage,
   });
 
-  bool get canGenerate => party != null && side != null && !isGenerating;
+  bool get canGenerate => party != null && sides.isNotEmpty && !isGenerating;
 
   bool get canPrint => lines.isNotEmpty && !isPrinting;
 
@@ -52,7 +51,7 @@ class BillDraftState {
 
   BillDraftState copyWith({
     Party? party,
-    BillSide? side,
+    Set<BillSide>? sides,
     DateTimeRange? dateRange,
     bool clearDateRange = false,
     bool? isGenerating,
@@ -63,7 +62,7 @@ class BillDraftState {
   }) {
     return BillDraftState(
       party: party ?? this.party,
-      side: side ?? this.side,
+      sides: sides ?? this.sides,
       dateRange: clearDateRange ? null : (dateRange ?? this.dateRange),
       isGenerating: isGenerating ?? this.isGenerating,
       isPrinting: isPrinting ?? this.isPrinting,
@@ -83,15 +82,18 @@ class BillPrintResult {
 
 class BillDraftViewModel extends StateNotifier<BillDraftState> {
   final Ref _ref;
-  final BillsRepository _repository;
-  final BillPdfService _pdfService = BillPdfService();
-
-  BillDraftViewModel(this._ref, this._repository)
-      : super(const BillDraftState());
+  BillDraftViewModel(this._ref) : super(const BillDraftState());
 
   void setParty(Party party) => state = state.copyWith(party: party);
 
-  void setSide(BillSide side) => state = state.copyWith(side: side);
+  void setSides(Set<BillSide> sides) {
+    if (sides.isNotEmpty) state = state.copyWith(sides: sides);
+  }
+
+  BillLine lineFor(Sauda sauda) {
+    final side = sideOfParty(sauda, state.party!.id, state.sides)!;
+    return BillLine.fromSauda(sauda, side);
+  }
 
   void setDateRange(DateTimeRange? range) => state = range == null
       ? state.copyWith(clearDateRange: true)
@@ -99,8 +101,7 @@ class BillDraftViewModel extends StateNotifier<BillDraftState> {
 
   Future<bool> generate() async {
     final party = state.party;
-    final side = state.side;
-    if (party == null || side == null) return false;
+    if (party == null || state.sides.isEmpty) return false;
 
     state = state.copyWith(isGenerating: true, errorMessage: null);
 
@@ -117,18 +118,18 @@ class BillDraftViewModel extends StateNotifier<BillDraftState> {
     }
 
     final all = saudasState.allSaudas;
-    final partySaudas = matchSaudas(all, partyId: party.id, side: side);
+    final partySaudas = matchSaudas(all, partyId: party.id, sides: state.sides);
     final inRange = matchSaudas(
       all,
       partyId: party.id,
-      side: side,
+      sides: state.sides,
       range: state.dateRange,
     );
 
     state = state.copyWith(
       isGenerating: false,
       partySaudas: partySaudas,
-      lines: inRange.map((s) => BillLine.fromSauda(s, side)).toList(),
+      lines: inRange.map(lineFor).toList(),
     );
     return true;
   }
@@ -149,40 +150,33 @@ class BillDraftViewModel extends StateNotifier<BillDraftState> {
   }
 
   void addSaudas(List<Sauda> saudas) {
-    final side = state.side;
-    if (side == null || saudas.isEmpty) return;
+    if (saudas.isEmpty) return;
     final lines = [
       ...state.lines,
-      ...saudas.map((s) => BillLine.fromSauda(s, side)),
+      ...saudas.map(lineFor),
     ]..sort((a, b) => a.date.compareTo(b.date));
     state = state.copyWith(lines: lines);
   }
 
   void addNewSauda(Sauda sauda) {
-    final side = state.side;
-    if (side == null) return;
     state = state.copyWith(
       partySaudas: [...state.partySaudas, sauda],
-      lines: [...state.lines, BillLine.fromSauda(sauda, side)]
+      lines: [...state.lines, lineFor(sauda)]
         ..sort((a, b) => a.date.compareTo(b.date)),
     );
   }
 
   Future<BillPrintResult?> printBill(Firm firm) async {
     final party = state.party;
-    final side = state.side;
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (party == null || side == null || userId == null || !state.canPrint) {
+    if (party == null || userId == null || !state.canPrint) {
       return null;
     }
 
     state = state.copyWith(isPrinting: true, errorMessage: null);
     try {
-      final number = await _repository.nextBillNumber();
-      final bill = Bill.create(
-        billNumber: number,
+      final draft = Bill.create(
         userId: userId,
-        side: side,
         partyId: party.id,
         partyName: party.partyName,
         partyCode: party.partyCode,
@@ -196,13 +190,21 @@ class BillDraftViewModel extends StateNotifier<BillDraftState> {
         rangeEnd: state.dateRange?.end,
         lines: state.lines,
       );
-      final pdf = await _pdfService.build(bill);
-      await _repository.saveBill(bill, pdf);
+      final billsVm = _ref.read(billsViewModelProvider.notifier);
+      final saved = await billsVm.createBill(draft);
+      if (saved == null) {
+        state = state.copyWith(
+          isPrinting: false,
+          errorMessage: _ref.read(billsViewModelProvider).errorMessage,
+        );
+        return null;
+      }
+      final pdf = await billsVm.buildPdf(saved);
       state = state.copyWith(isPrinting: false);
-      return BillPrintResult(bill, pdf);
+      return BillPrintResult(saved, pdf);
     } catch (e) {
       debugPrint('[BillDraftViewModel] printBill error: $e');
-      state = state.copyWith(isPrinting: false, errorMessage: e.toString());
+      state = state.copyWith(isPrinting: false, errorMessage: friendlyError(e));
       return null;
     }
   }

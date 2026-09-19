@@ -85,7 +85,7 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
     final picked = await showAddSaudasSheet(
       context: context,
       saudas: state.availableSaudas,
-      side: state.side!,
+      lineFor: ref.read(billDraftViewModelProvider.notifier).lineFor,
     );
     if (picked != null && mounted) {
       ref.read(billDraftViewModelProvider.notifier).addSaudas(picked);
@@ -94,8 +94,10 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
 
   Future<void> _addNewSauda() async {
     final state = ref.read(billDraftViewModelProvider);
-    final side = state.side!;
     final party = state.party!;
+
+    final side = await _chooseRole(state.sides);
+    if (side == null || !mounted) return;
 
     final created = await context.push<Sauda>(
       '/add-sauda',
@@ -108,6 +110,43 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
       ref.read(billDraftViewModelProvider.notifier).addNewSauda(created);
     }
   }
+
+  Future<BillSide?> _chooseRole(Set<BillSide> sides) async {
+    if (sides.length == 1) return sides.first;
+
+    return showModalBottomSheet<BillSide>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'In this new sauda the party is the',
+                style: Theme.of(sheetContext).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 8),
+              for (final side in BillSide.values)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(side.label),
+                  onTap: () => Navigator.pop(sheetContext, side),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _rolesText(Set<BillSide> sides) => sides.length == 2
+      ? 'as buyer & seller'
+      : 'as ${sides.first.label.toLowerCase()} only';
 
   Future<void> _print() async {
     final firm = await showFirmPicker(context: context);
@@ -139,7 +178,7 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
 
     await Printing.layoutPdf(
       onLayout: (_) async => result.pdf,
-      name: result.bill.pdfFileName,
+      name: result.bill.shareName,
     );
 
     router.pop();
@@ -153,7 +192,6 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
     final state = ref.watch(billDraftViewModelProvider);
     final vm = ref.read(billDraftViewModelProvider.notifier);
     final party = state.party!;
-    final side = state.side!;
     final visible = _query.isEmpty
         ? state.lines
         : state.lines.where((l) => l.matchesQuery(_query)).toList();
@@ -161,7 +199,7 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: Text('${side.title} Preview'),
+        title: const Text('Bill Preview'),
         centerTitle: true,
       ),
       body: Column(
@@ -180,8 +218,8 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
                 const SizedBox(height: 2),
                 Text(
                   state.dateRange == null
-                      ? 'All saudas to date · ${side.label} side'
-                      : '${formatBillDate(state.dateRange!.start)} - ${formatBillDate(state.dateRange!.end)} · ${side.label} side',
+                      ? 'All saudas to date · ${_rolesText(state.sides)}'
+                      : '${formatBillDate(state.dateRange!.start)} - ${formatBillDate(state.dateRange!.end)} · ${_rolesText(state.sides)}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 10),
@@ -216,8 +254,7 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
                 controller: _searchController,
                 onChanged: _onSearch,
                 decoration: InputDecoration(
-                  hintText:
-                      'Search sauda no, item, ${side.counterPartyLabel.toLowerCase()}, date...',
+                  hintText: 'Search sauda no, item, buyer, seller, date...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _query.isEmpty
                       ? null
@@ -252,7 +289,7 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
                       padding: const EdgeInsets.all(24),
                       child: Text(
                         state.partySaudas.isEmpty
-                            ? 'No saudas found for this party as ${side.label.toLowerCase()}.\nCreate a new sauda to bill it.'
+                            ? 'No saudas found for this party ${_rolesText(state.sides)}.\nCreate a new sauda to bill it.'
                             : 'No rows in this bill.\nAdd saudas or create a new one to continue.',
                         textAlign: TextAlign.center,
                       ),
@@ -282,7 +319,6 @@ class _BillPreviewScreenState extends ConsumerState<BillPreviewScreen> {
                             onDismissed: (_) => vm.removeLine(line.id),
                             child: BillLineCard(
                               line: line,
-                              side: side,
                               onDelete: () => vm.removeLine(line.id),
                               onEditRate: () => _editRate(
                                   line.id, line.brokerageRatePerQuintal),

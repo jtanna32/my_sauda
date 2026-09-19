@@ -5,12 +5,14 @@ import 'bill_format.dart';
 
 enum BillSide { buyer, seller }
 
+BillSide? _sideFromName(String? name) => switch (name) {
+      'buyer' => BillSide.buyer,
+      'seller' => BillSide.seller,
+      _ => null,
+    };
+
 extension BillSideX on BillSide {
-  String get folder => this == BillSide.buyer ? 'buyers_bill' : 'sellers_bill';
-
   String get label => this == BillSide.buyer ? 'Buyer' : 'Seller';
-
-  String get title => '$label Bill';
 
   BillSide get opposite =>
       this == BillSide.buyer ? BillSide.seller : BillSide.buyer;
@@ -21,27 +23,36 @@ extension BillSideX on BillSide {
       this == BillSide.buyer ? s.buyerPartyId : s.sellerPartyId;
 }
 
+// Bills saved before the rate became text stored it as a number under another key.
+String? _legacyRate(dynamic value) => value is num
+    ? (value % 1 == 0 ? value.toInt().toString() : value.toString())
+    : null;
+
 class BillLine {
   final String id;
   final String? saudaId;
+  // The role the billed party played in this sauda; decides the rate and which PDF column holds the party.
+  final BillSide side;
   final DateTime date;
   final String saudaNumber;
   final String itemName;
   final String counterParty;
   final double quantityQuintals;
-  final double? saleRatePerQuintal;
+  // Free text as typed on the sauda; only a plain number is ever converted.
+  final String? saleRate;
   final double brokerageRatePerQuintal;
   final double? savedAmount;
 
   const BillLine({
     required this.id,
     this.saudaId,
+    required this.side,
     required this.date,
     required this.saudaNumber,
     required this.itemName,
     required this.counterParty,
     required this.quantityQuintals,
-    this.saleRatePerQuintal,
+    this.saleRate,
     required this.brokerageRatePerQuintal,
     this.savedAmount,
   });
@@ -52,26 +63,32 @@ class BillLine {
     return BillLine(
       id: s.id,
       saudaId: s.id,
+      side: side,
       date: s.saudaDate,
       saudaNumber: s.saudaNumber,
       itemName: s.itemName ?? '',
       counterParty: (isBuyer ? s.sellerPartyName : s.buyerPartyName) ?? '',
       quantityQuintals: BillCalculator.toQuintals(s.quantity, s.unitName),
-      saleRatePerQuintal: s.ratePerQuintal,
+      saleRate: s.ratePerQuintal.isEmpty ? null : s.ratePerQuintal,
       brokerageRatePerQuintal: rate ?? 0,
     );
   }
 
-  factory BillLine.fromJson(Map<String, dynamic> json) {
+  factory BillLine.fromJson(
+    Map<String, dynamic> json, {
+    BillSide fallbackSide = BillSide.buyer,
+  }) {
     return BillLine(
       id: json['id'] as String,
       saudaId: json['sauda_id'] as String?,
+      side: _sideFromName(json['side'] as String?) ?? fallbackSide,
       date: DateTime.parse(json['date'] as String),
       saudaNumber: json['sauda_number'] as String? ?? '',
       itemName: json['item_name'] as String? ?? '',
       counterParty: json['counter_party'] as String? ?? '',
       quantityQuintals: (json['quantity_quintals'] as num).toDouble(),
-      saleRatePerQuintal: (json['sale_rate_per_quintal'] as num?)?.toDouble(),
+      saleRate: json['sale_rate'] as String? ??
+          _legacyRate(json['sale_rate_per_quintal']),
       brokerageRatePerQuintal:
           (json['brokerage_rate_per_quintal'] as num?)?.toDouble() ?? 0,
       savedAmount: (json['brokerage_amount'] as num?)?.toDouble(),
@@ -81,15 +98,18 @@ class BillLine {
   Map<String, dynamic> toJson() => {
         'id': id,
         'sauda_id': saudaId,
+        'side': side.name,
         'date': date.toIso8601String(),
         'sauda_number': saudaNumber,
         'item_name': itemName,
         'counter_party': counterParty,
         'quantity_quintals': quantityQuintals,
-        'sale_rate_per_quintal': saleRatePerQuintal,
+        'sale_rate': saleRate,
         'brokerage_rate_per_quintal': brokerageRatePerQuintal,
         'brokerage_amount': brokerageAmount,
       };
+
+  double? get numericSaleRate => parseNumericRate(saleRate);
 
   double get quantityTons => BillCalculator.toTons(quantityQuintals);
 
@@ -115,24 +135,26 @@ class BillLine {
   BillLine withRate(double rate) => BillLine(
         id: id,
         saudaId: saudaId,
+        side: side,
         date: date,
         saudaNumber: saudaNumber,
         itemName: itemName,
         counterParty: counterParty,
         quantityQuintals: quantityQuintals,
-        saleRatePerQuintal: saleRatePerQuintal,
+        saleRate: saleRate,
         brokerageRatePerQuintal: rate,
       );
 
   BillLine frozen() => BillLine(
         id: id,
         saudaId: saudaId,
+        side: side,
         date: date,
         saudaNumber: saudaNumber,
         itemName: itemName,
         counterParty: counterParty,
         quantityQuintals: quantityQuintals,
-        saleRatePerQuintal: saleRatePerQuintal,
+        saleRate: saleRate,
         brokerageRatePerQuintal: brokerageRatePerQuintal,
         savedAmount: brokerageAmount,
       );
@@ -177,7 +199,6 @@ class Bill {
 
   final String billNumber;
   final String userId;
-  final BillSide side;
   final String partyId;
   final String partyName;
   final String partyCode;
@@ -194,7 +215,6 @@ class Bill {
   const Bill({
     required this.billNumber,
     required this.userId,
-    required this.side,
     required this.partyId,
     required this.partyName,
     required this.partyCode,
@@ -210,9 +230,8 @@ class Bill {
   });
 
   factory Bill.create({
-    required String billNumber,
+    String billNumber = '',
     required String userId,
-    required BillSide side,
     required String partyId,
     required String partyName,
     required String partyCode,
@@ -228,7 +247,6 @@ class Bill {
     return Bill(
       billNumber: billNumber,
       userId: userId,
-      side: side,
       partyId: partyId,
       partyName: partyName,
       partyCode: partyCode,
@@ -245,8 +263,13 @@ class Bill {
   }
 
   factory Bill.fromJson(Map<String, dynamic> json) {
+    // Bills saved before mixed buyer/seller bills carried one side for the whole bill.
+    final legacySide = _sideFromName(json['side'] as String?);
     final lines = (json['lines'] as List)
-        .map((e) => BillLine.fromJson(e as Map<String, dynamic>))
+        .map((e) => BillLine.fromJson(
+              e as Map<String, dynamic>,
+              fallbackSide: legacySide ?? BillSide.buyer,
+            ))
         .toList();
     final totals = json['totals'] != null
         ? BillTotals.fromJson(json['totals'] as Map<String, dynamic>)
@@ -254,9 +277,6 @@ class Bill {
     return Bill(
       billNumber: json['bill_number'] as String,
       userId: json['user_id'] as String,
-      side: (json['side'] as String) == 'seller'
-          ? BillSide.seller
-          : BillSide.buyer,
       partyId: json['party_id'] as String,
       partyName: json['party_name'] as String? ?? '',
       partyCode: json['party_code'] as String? ?? '',
@@ -282,7 +302,6 @@ class Bill {
         'schema_version': schemaVersion,
         'bill_number': billNumber,
         'user_id': userId,
-        'side': side.name,
         'party_id': partyId,
         'party_name': partyName,
         'party_code': partyCode,
@@ -297,5 +316,13 @@ class Bill {
         'created_at': createdAt.toIso8601String(),
       };
 
-  String get pdfFileName => '$billNumber.pdf';
+  // Name shown to the user when printing or sharing, e.g. AGT_Foods_India_Pvt_Ltd_BILL-0001.
+  String get shareName {
+    final party = partyName
+        .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    return party.isEmpty ? billNumber : '${party}_$billNumber';
+  }
+
+  String get sharePdfFileName => '$shareName.pdf';
 }

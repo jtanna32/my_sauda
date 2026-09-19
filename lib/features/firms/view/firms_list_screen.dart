@@ -54,10 +54,14 @@ class _FirmsListScreenState extends ConsumerState<FirmsListScreen> {
 
     if (!mounted) return;
 
+    final failure = ref.read(firmsViewModelProvider).errorMessage ??
+        'Failed to delete firm';
+    if (!success) vm.clearMessages();
+
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Firm deleted successfully' : 'Failed to delete firm',
+          success ? 'Firm deleted successfully' : failure,
         ),
         backgroundColor:
             success ? AppTheme.primaryColor : AppTheme.errorColor,

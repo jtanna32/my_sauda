@@ -21,7 +21,7 @@ class _BillViewScreenState extends ConsumerState<BillViewScreen> {
   @override
   void initState() {
     super.initState();
-    _pdf = ref.read(billsRepositoryProvider).readPdf(widget.bill);
+    _pdf = ref.read(billsViewModelProvider.notifier).buildPdf(widget.bill);
   }
 
   @override
@@ -44,7 +44,7 @@ class _BillViewScreenState extends ConsumerState<BillViewScreen> {
           }
           return PdfPreview(
             build: (_) => snapshot.data!,
-            pdfFileName: widget.bill.pdfFileName,
+            pdfFileName: widget.bill.sharePdfFileName,
             canChangeOrientation: false,
             canChangePageFormat: false,
             canDebug: false,
